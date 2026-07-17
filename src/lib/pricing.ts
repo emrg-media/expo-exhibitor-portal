@@ -4,6 +4,12 @@
 
 export const PROCESSING_FEE_RATE = 0.03; // 3% credit card processing fee, applied to every order
 
+// CONFIRM with Jessica: 2025 event details, used in the hero.
+export const EVENT_INFO = {
+  dates: "October 14 to 16, 2025",
+  venue: "Metropolitan Pavilion, New York",
+};
+
 // ── Electricity ──────────────────────────────────────────────────────────────
 // CONFIRM: 2025 form lists the 20-amp outlet at "$150 per day x days". Treating
 // it as a flat $150 each for now; flip PER_DAY to true and set EVENT_DAYS if it
