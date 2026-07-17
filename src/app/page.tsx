@@ -94,7 +94,7 @@ export default function BoothServicesPage() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 md:px-8 -mt-8">
+      <div className="max-w-5xl mx-auto px-6 md:px-8 pt-8">
         <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
 
           {/* Left: form */}
