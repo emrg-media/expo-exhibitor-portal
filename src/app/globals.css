@@ -1,11 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f4f2;
-  --foreground: #111111;
+  --background: #f4f1ec;
+  --foreground: #16130f;
   --emrg-red: #c0182a;
-  --emrg-red-dark: #a01020;
+  --emrg-red-dark: #9e0f1f;
+  --emrg-red-bright: #d81f34;
   --emrg-black: #0d0d0d;
+  --ink-soft: #6b625a;
+  --card-shadow: 0 1px 2px rgba(20, 17, 15, 0.04), 0 6px 20px -8px rgba(20, 17, 15, 0.12);
+  --card-shadow-lg: 0 2px 4px rgba(20, 17, 15, 0.05), 0 18px 40px -14px rgba(20, 17, 15, 0.22);
 }
 
 @theme inline {
@@ -16,12 +20,37 @@
 }
 
 body {
-  background: var(--background);
+  /* Warm, subtly graded ground so it never reads as flat */
+  background:
+    radial-gradient(1100px 500px at 50% -8%, rgba(192, 24, 42, 0.06), transparent 60%),
+    linear-gradient(180deg, #f7f4ef 0%, #f1ede7 100%);
+  background-attachment: fixed;
   color: var(--foreground);
 }
 
+/* Premium building blocks */
+.premium-card {
+  background: #ffffff;
+  border: 1px solid rgba(20, 17, 15, 0.07);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+}
+.hero-gradient {
+  background:
+    radial-gradient(600px 300px at 82% -30%, rgba(216, 31, 52, 0.30), transparent 62%),
+    linear-gradient(160deg, #1a1613 0%, #0d0b0a 62%, #050403 100%);
+}
+.cta-gradient {
+  background: linear-gradient(180deg, var(--emrg-red-bright) 0%, var(--emrg-red) 55%, var(--emrg-red-dark) 100%);
+  box-shadow: 0 1px 1px rgba(255,255,255,0.25) inset, 0 8px 22px -8px rgba(192, 24, 42, 0.55);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.cta-gradient:not(:disabled):hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 12px 28px -8px rgba(192, 24, 42, 0.6); }
+.cta-gradient:not(:disabled):active { transform: translateY(0); }
+.cta-gradient:disabled { background: #d9d4cd; box-shadow: none; }
+
 /* Custom scrollbar */
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d1ccc5; border-radius: 99px; }
 
@@ -29,11 +58,7 @@ body {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--emrg-red) !important;
-  box-shadow: 0 0 0 3px rgba(192, 24, 42, 0.08);
+  box-shadow: 0 0 0 3px rgba(192, 24, 42, 0.10);
 }
 
-/* Checkbox accent */
-input[type="checkbox"] {
-  accent-color: var(--emrg-red);
-  cursor: pointer;
-}
+input[type="checkbox"] { accent-color: var(--emrg-red); cursor: pointer; }

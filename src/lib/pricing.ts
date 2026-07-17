@@ -28,11 +28,11 @@ export interface LeadTier {
   end: string;     // inclusive last day, YYYY-MM-DD
 }
 export const LEAD_TIERS: LeadTier[] = [
-  { id: "t1", label: "Up to Sep 19", price: 150, end: "2025-09-19" },
-  { id: "t2", label: "Sep 20 to 30", price: 200, end: "2025-09-30" },
-  { id: "t3", label: "Oct 1 to 9", price: 250, end: "2025-10-09" },
-  { id: "t4", label: "Oct 9 to 14", price: 350, end: "2025-10-14" },
-  { id: "t5", label: "Oct 14 to 16", price: 400, end: "2025-10-16" },
+  { id: "t1", label: "Through September 19", price: 150, end: "2025-09-19" },
+  { id: "t2", label: "September 20 to 30", price: 200, end: "2025-09-30" },
+  { id: "t3", label: "October 1 to 9", price: 250, end: "2025-10-09" },
+  { id: "t4", label: "October 9 to 14", price: 350, end: "2025-10-14" },
+  { id: "t5", label: "October 14 to 16", price: 400, end: "2025-10-16" },
 ];
 
 // ── Selection + computation ──────────────────────────────────────────────────
