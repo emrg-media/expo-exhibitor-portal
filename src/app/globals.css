@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f4f2;
+  --foreground: #111111;
+  --emrg-red: #c0182a;
+  --emrg-red-dark: #a01020;
+  --emrg-black: #0d0d0d;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1ccc5; border-radius: 99px; }
+
+/* Input focus ring */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--emrg-red) !important;
+  box-shadow: 0 0 0 3px rgba(192, 24, 42, 0.08);
+}
+
+/* Checkbox accent */
+input[type="checkbox"] {
+  accent-color: var(--emrg-red);
+  cursor: pointer;
+}
