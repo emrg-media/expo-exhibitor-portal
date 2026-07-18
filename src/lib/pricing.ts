@@ -4,11 +4,14 @@
 
 export const PROCESSING_FEE_RATE = 0.03; // 3% credit card processing fee, applied to every order
 
-// CONFIRM with Jessica: 2025 event details, used in the hero.
+// 2026 event details (from Jessica).
 export const EVENT_INFO = {
-  dates: "October 14 to 16, 2025",
+  dates: "October 27 to 29, 2026",
   venue: "Metropolitan Pavilion, New York",
 };
+
+// Order deadline for Wi-Fi and Electric (from the exhibitor form).
+export const WIFI_ELECTRIC_DEADLINE = "Friday, October 2";
 
 // ── Electricity ──────────────────────────────────────────────────────────────
 // CONFIRM: 2025 form lists the 20-amp outlet at "$150 per day x days". Treating
@@ -34,11 +37,12 @@ export interface LeadTier {
   end: string;     // inclusive last day, YYYY-MM-DD
 }
 export const LEAD_TIERS: LeadTier[] = [
-  { id: "t1", label: "Through September 19", price: 150, end: "2025-09-19" },
-  { id: "t2", label: "September 20 to 30", price: 200, end: "2025-09-30" },
-  { id: "t3", label: "October 1 to 9", price: 250, end: "2025-10-09" },
-  { id: "t4", label: "October 9 to 14", price: 350, end: "2025-10-14" },
-  { id: "t5", label: "October 14 to 16", price: 400, end: "2025-10-16" },
+  { id: "t1", label: "Through September 18", price: 150, end: "2026-09-18" },
+  { id: "t2", label: "September 19 to 29", price: 250, end: "2026-09-29" },
+  { id: "t3", label: "September 30 to October 9", price: 300, end: "2026-10-09" },
+  { id: "t4", label: "October 10 to 16", price: 350, end: "2026-10-16" },
+  { id: "t5", label: "October 17 to 24", price: 400, end: "2026-10-24" },
+  { id: "t6", label: "October 25 to 29", price: 550, end: "2026-10-29" },
 ];
 
 // ── Selection + computation ──────────────────────────────────────────────────
@@ -122,7 +126,7 @@ export function computeOrder(sel: OrderSelection, today: Date): OrderTotals {
     if (tier) {
       lines.push({
         key: "lead",
-        label: "Lead Retrieval (Crowd Pass)",
+        label: "Lead Retrieval App (Eventdex)",
         detail: tier.label,
         qty: 1, unit: tier.price, amount: tier.price,
       });

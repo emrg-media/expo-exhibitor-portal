@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  LEAD_TIERS, ELECTRIC, EVENT_DAYS, WIFI_PER_DEVICE, PROCESSING_FEE_RATE, EVENT_INFO,
+  LEAD_TIERS, ELECTRIC, EVENT_DAYS, WIFI_PER_DEVICE, PROCESSING_FEE_RATE, EVENT_INFO, WIFI_ELECTRIC_DEADLINE,
   computeOrder, currentLeadTier, tierStatus, fmt,
   type OrderSelection, type OrderTotals, type LeadTier,
 } from "@/lib/pricing";
@@ -54,6 +54,7 @@ export default function BoothServicesPage() {
   const amp20Amount = sel.amp20Qty * amp20Unit;
   const stripAmount = sel.powerStripQty * ELECTRIC.powerStripPrice;
   const electricitySubtotal = amp20Amount + stripAmount;
+  const powerStripLocked = sel.amp20Qty === 0; // a power strip requires a 20-amp outlet
   const wifiAmount = sel.wifiDevices * WIFI_PER_DEVICE;
 
   // Always-present service lines so the summary reads like a receipt being written.
@@ -94,7 +95,8 @@ export default function BoothServicesPage() {
       {/* Hero */}
       <header className="hero-gradient text-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-6 md:px-8 pt-12 pb-16 relative">
-          <p className="text-[10.5px] tracking-[0.34em] uppercase text-white/45 mb-3">The Event Planner Expo</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-11 md:h-14 w-auto mb-6" style={{ filter: "brightness(0) invert(1)" }} />
           <h1 className="text-[36px] md:text-[46px] font-bold leading-[1.02]" style={{ letterSpacing: "-0.03em" }}>Booth Services</h1>
           <p className="text-[14.5px] text-white/55 mt-3 max-w-md leading-relaxed">
             Order electricity, Wi-Fi, and lead retrieval for your booth. Pay securely and get an instant receipt by email.
@@ -125,6 +127,9 @@ export default function BoothServicesPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-6 md:px-8 pt-8">
+        <div className="mb-5">
+          <Note>Wi-Fi, Electric, and Lead Retrieval must be ordered before the Expo, and cannot be ordered on show days ({EVENT_INFO.dates}). Please order by the deadlines shown for each service.</Note>
+        </div>
         <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
 
           {/* Left: form */}
@@ -149,26 +154,33 @@ export default function BoothServicesPage() {
 
             {/* Electricity */}
             <section ref={(el) => { sectionRefs.current[1] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={2} note={electricitySubtotal}>Electricity</StepTitle>
-              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">Each 20-amp outlet covers up to 1700W. For 1800W or more, order two.</p>
+              <StepTitle n={2} note={electricitySubtotal}>Electric</StepTitle>
+              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">A 20-amp outlet is required before adding a power strip.</p>
               <div className="mt-2">
-                <QtyRow label="20-amp outlet" unitLabel={`${fmt(amp20Unit)} each`} value={sel.amp20Qty} lineTotal={amp20Amount} onChange={(v) => setQty("amp20Qty", v)} />
-                <QtyRow label="Power strip" unitLabel={`${fmt(ELECTRIC.powerStripPrice)} per cord`} value={sel.powerStripQty} lineTotal={stripAmount} onChange={(v) => setQty("powerStripQty", v)} />
+                <QtyRow label="20 Amps Electrical Outlet" unitLabel={`${fmt(amp20Unit)} / outlet`} value={sel.amp20Qty} lineTotal={amp20Amount}
+                  onChange={(v) => setSel((p) => ({ ...p, amp20Qty: Math.max(0, v), powerStripQty: v <= 0 ? 0 : p.powerStripQty }))} />
+                <QtyRow label="Power Strip (4 to 5 outlets)"
+                  unitLabel={powerStripLocked ? `${fmt(ELECTRIC.powerStripPrice)} / cord. Add an outlet first.` : `${fmt(ELECTRIC.powerStripPrice)} / cord`}
+                  value={sel.powerStripQty} lineTotal={stripAmount} disabled={powerStripLocked} onChange={(v) => setQty("powerStripQty", v)} />
+              </div>
+              <div className="mt-4">
+                <Note>Each 20-amp outlet covers 1,700W at 110V, so order two for 1,800W or more. A power strip requires a 20-amp outlet. All Wi-Fi and Electric orders must be submitted by {WIFI_ELECTRIC_DEADLINE}. For a direct tie into main power, labor fees apply; contact the Metropolitan Pavilion coordinator.</Note>
               </div>
             </section>
 
             {/* Wi-Fi */}
             <section ref={(el) => { sectionRefs.current[2] = el; }} className="premium-card p-6 md:p-7">
               <StepTitle n={3} note={wifiAmount}>Wi-Fi</StepTitle>
-              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">{fmt(WIFI_PER_DEVICE)} per device. Choose how many devices need Wi-Fi.</p>
+              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">{fmt(WIFI_PER_DEVICE)} per device. Choose how many devices need Wi-Fi (for example, 3 devices is $60).</p>
               <div className="mt-2">
-                <QtyRow label="Wi-Fi devices" unitLabel={`${fmt(WIFI_PER_DEVICE)} per device`} value={sel.wifiDevices} lineTotal={wifiAmount} onChange={(v) => setQty("wifiDevices", v)} />
+                <QtyRow label="Wi-Fi Device Access" unitLabel={`${fmt(WIFI_PER_DEVICE)} / device`} value={sel.wifiDevices} lineTotal={wifiAmount} onChange={(v) => setQty("wifiDevices", v)} />
               </div>
             </section>
 
             {/* Lead Retrieval */}
             <section ref={(el) => { sectionRefs.current[3] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={4}>Lead Retrieval</StepTitle>
+              <StepTitle n={4}>Lead Retrieval App</StepTitle>
+              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">Powered by Eventdex. Scan attendee badges and follow up after the show.</p>
               <LeadRetrieval today={today} leadTier={leadTier} leadClosed={leadClosed}
                 checked={sel.leadRetrieval} onToggle={(b) => setSel((p) => ({ ...p, leadRetrieval: b }))} />
             </section>
@@ -326,6 +338,18 @@ function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
         <span className="text-[14px] font-medium">Add Lead Retrieval at today&apos;s price</span>
         <span className="ml-auto num text-[16px] font-bold" style={{ color: "var(--emrg-red)" }}>{fmt(leadTier!.price)}</span>
       </label>
+      <div className="mt-4">
+        <Note>Pricing increases automatically as each sign-up deadline passes. Register early to lock in the lower rate.</Note>
+      </div>
+    </div>
+  );
+}
+
+function Note({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl px-4 py-3 text-[12.5px] leading-relaxed"
+      style={{ background: "rgba(192,24,42,0.045)", border: "1px solid rgba(192,24,42,0.16)", color: "var(--ink-soft)" }}>
+      <span className="font-bold" style={{ color: "var(--emrg-red)" }}>Important. </span>{children}
     </div>
   );
 }
@@ -389,25 +413,25 @@ function Field({ label, value, onChange, onBlur, placeholder, required, invalid,
   );
 }
 
-function QtyRow({ label, unitLabel, value, lineTotal, onChange }: {
-  label: string; unitLabel: string; value: number; lineTotal: number; onChange: (v: number) => void;
+function QtyRow({ label, unitLabel, value, lineTotal, onChange, disabled }: {
+  label: string; unitLabel: string; value: number; lineTotal: number; onChange: (v: number) => void; disabled?: boolean;
 }) {
   const anim = useCountUp(lineTotal);
   const active = value > 0;
   return (
-    <div className="flex items-center gap-3 py-3.5" style={{ borderTop: "1px solid var(--hairline)" }}>
+    <div className="flex items-center gap-3 py-3.5" style={{ borderTop: "1px solid var(--hairline)", opacity: disabled ? 0.5 : 1 }}>
       <div className="min-w-0">
         <p className="text-[14.5px] font-semibold" style={{ letterSpacing: "-0.01em" }}>{label}</p>
         <p className="text-[12px] text-[color:var(--ink-faint)]">{unitLabel}</p>
       </div>
       <div className="ml-auto flex items-center gap-3">
         <div className="flex items-center rounded-xl border bg-stone-50/60 p-0.5" style={{ borderColor: "var(--hairline)" }}>
-          <button onClick={() => onChange(value - 1)} disabled={value <= 0}
+          <button onClick={() => onChange(value - 1)} disabled={disabled || value <= 0}
             className="spring w-8 h-8 rounded-lg text-stone-600 text-lg leading-none hover:bg-white disabled:opacity-25" aria-label={`Decrease ${label}`}>−</button>
-          <input value={value} onChange={(e) => onChange(parseInt(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+          <input value={value} onChange={(e) => onChange(parseInt(e.target.value.replace(/[^0-9]/g, "")) || 0)} disabled={disabled}
             className="tnum w-10 text-center bg-transparent text-[15px] font-semibold outline-none" inputMode="numeric" aria-label={`${label} quantity`} />
-          <button onClick={() => onChange(value + 1)}
-            className="spring w-8 h-8 rounded-lg text-stone-600 text-lg leading-none hover:bg-white" aria-label={`Increase ${label}`}>+</button>
+          <button onClick={() => onChange(value + 1)} disabled={disabled}
+            className="spring w-8 h-8 rounded-lg text-stone-600 text-lg leading-none hover:bg-white disabled:opacity-25" aria-label={`Increase ${label}`}>+</button>
         </div>
         <span className="num w-24 text-right text-[15px] font-bold" style={{ color: active ? "#16130f" : "#cfc8bf" }}>{fmt(anim)}</span>
       </div>
