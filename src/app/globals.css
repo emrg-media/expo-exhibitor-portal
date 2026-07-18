@@ -48,12 +48,15 @@ body {
 }
 
 /* Numerals read as financial software: mono, tabular, aligned */
+/* Mono numerals: strictly for the price column, totals, and hero metadata */
 .num {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   letter-spacing: -0.01em;
 }
+/* Tabular figures in the body sans: for quantities, so widths don't shift */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 
 .premium-card {
   background: #ffffff;
@@ -83,11 +86,19 @@ body {
 .cta-gradient {
   background: linear-gradient(180deg, var(--emrg-red-bright) 0%, var(--emrg-red) 55%, var(--emrg-red-dark) 100%);
   box-shadow: 0 1px 1px rgba(255, 255, 255, 0.25) inset, 0 10px 24px -8px rgba(192, 24, 42, 0.55);
-  transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.14s ease, box-shadow 0.14s ease;
+  border: 1px solid transparent;
+  transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.14s ease,
+              background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 .cta-gradient:not(:disabled):hover { filter: brightness(1.05); transform: translateY(-1px); }
 .cta-gradient:not(:disabled):active { transform: translateY(0) scale(0.99); }
-.cta-gradient:disabled { background: #ded9d2; box-shadow: none; color: #a8a097; }
+/* Ghost while inert: hairline outline, no fill, muted text. Snaps to the gradient on enable. */
+.cta-gradient:disabled {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-faint);
+  border-color: var(--hairline);
+}
 
 /* Stepper buttons: gentle spring on press */
 .spring { transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.12s ease; }
