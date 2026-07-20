@@ -96,7 +96,7 @@ export default function BoothServicesPage() {
       <header className="hero-gradient text-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-6 md:px-8 pt-12 pb-16 relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-11 md:h-14 w-auto mb-6" style={{ filter: "brightness(0) invert(1)" }} />
+          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-16 md:h-20 w-auto mb-7" style={{ filter: "brightness(0) invert(1)" }} />
           <h1 className="text-[36px] md:text-[46px] font-bold leading-[1.02]" style={{ letterSpacing: "-0.03em" }}>Booth Services</h1>
           <p className="text-[14.5px] text-white/55 mt-3 max-w-md leading-relaxed">
             Order electricity, Wi-Fi, and lead retrieval for your booth. Pay securely and get an instant receipt by email.
