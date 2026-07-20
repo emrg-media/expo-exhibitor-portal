@@ -100,7 +100,7 @@ export function computeOrder(sel: OrderSelection, today: Date): OrderTotals {
     const unit = ELECTRIC.amp20Price * (ELECTRIC.amp20PerDay ? EVENT_DAYS : 1);
     lines.push({
       key: "amp20",
-      label: "20-amp electrical outlet",
+      label: "20-amp outlet",
       detail: ELECTRIC.amp20PerDay ? `$${ELECTRIC.amp20Price}/day x ${EVENT_DAYS} days` : "each",
       qty: sel.amp20Qty, unit, amount: unit * sel.amp20Qty,
     });
@@ -116,7 +116,7 @@ export function computeOrder(sel: OrderSelection, today: Date): OrderTotals {
   if (sel.wifiDevices > 0) {
     lines.push({
       key: "wifi",
-      label: "Wi-Fi",
+      label: "Wi-Fi device",
       detail: "per device",
       qty: sel.wifiDevices, unit: WIFI_PER_DEVICE, amount: WIFI_PER_DEVICE * sel.wifiDevices,
     });
@@ -126,7 +126,7 @@ export function computeOrder(sel: OrderSelection, today: Date): OrderTotals {
     if (tier) {
       lines.push({
         key: "lead",
-        label: "Lead Retrieval App (Eventdex)",
+        label: "Lead Retrieval",
         detail: tier.label,
         qty: 1, unit: tier.price, amount: tier.price,
       });

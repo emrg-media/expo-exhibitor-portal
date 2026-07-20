@@ -8,7 +8,7 @@ import {
 } from "@/lib/pricing";
 import { useCountUp, formatPhone, isValidEmail } from "@/lib/ui";
 
-const STEPS = ["Company", "Electricity", "Wi-Fi", "Lead Retrieval"];
+const STEPS = ["Company", "Electric", "Wi-Fi", "Lead Retrieval"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function shortEnd(end: string): string {
   const [, m, d] = end.split("-").map(Number);
@@ -61,7 +61,7 @@ export default function BoothServicesPage() {
   const summaryLines = [
     { key: "amp20", label: "20-amp outlet", qty: sel.amp20Qty, unit: amp20Unit, amount: amp20Amount },
     { key: "strip", label: "Power strip", qty: sel.powerStripQty, unit: ELECTRIC.powerStripPrice, amount: stripAmount },
-    { key: "wifi", label: "Wi-Fi", qty: sel.wifiDevices, unit: WIFI_PER_DEVICE, amount: wifiAmount },
+    { key: "wifi", label: "Wi-Fi device", qty: sel.wifiDevices, unit: WIFI_PER_DEVICE, amount: wifiAmount },
     ...(!leadClosed ? [{ key: "lead", label: "Lead Retrieval", qty: sel.leadRetrieval ? 1 : 0, unit: leadTier!.price, amount: sel.leadRetrieval ? leadTier!.price : 0 }] : []),
   ];
 
@@ -127,9 +127,6 @@ export default function BoothServicesPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-6 md:px-8 pt-8">
-        <div className="mb-5">
-          <Note>Wi-Fi, Electric, and Lead Retrieval must be ordered before the Expo, and cannot be ordered on show days ({EVENT_INFO.dates}). Please order by the deadlines shown for each service.</Note>
-        </div>
         <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
 
           {/* Left: form */}
@@ -154,32 +151,32 @@ export default function BoothServicesPage() {
 
             {/* Electricity */}
             <section ref={(el) => { sectionRefs.current[1] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={2} note={electricitySubtotal}>Electric</StepTitle>
+              <StepTitle n={2} note={electricitySubtotal} deadline={`Order by ${WIFI_ELECTRIC_DEADLINE}`}>Electric</StepTitle>
               <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">A 20-amp outlet is required before adding a power strip.</p>
               <div className="mt-2">
-                <QtyRow label="20 Amps Electrical Outlet" unitLabel={`${fmt(amp20Unit)} / outlet`} value={sel.amp20Qty} lineTotal={amp20Amount}
+                <QtyRow label="20-amp outlet" unitLabel={`${fmt(amp20Unit)} / outlet`} value={sel.amp20Qty} lineTotal={amp20Amount}
                   onChange={(v) => setSel((p) => ({ ...p, amp20Qty: Math.max(0, v), powerStripQty: v <= 0 ? 0 : p.powerStripQty }))} />
-                <QtyRow label="Power Strip (4 to 5 outlets)"
+                <QtyRow label="Power strip"
                   unitLabel={powerStripLocked ? `${fmt(ELECTRIC.powerStripPrice)} / cord. Add an outlet first.` : `${fmt(ELECTRIC.powerStripPrice)} / cord`}
                   value={sel.powerStripQty} lineTotal={stripAmount} disabled={powerStripLocked} onChange={(v) => setQty("powerStripQty", v)} />
               </div>
               <div className="mt-4">
-                <Note>Each 20-amp outlet covers 1,700W at 110V, so order two for 1,800W or more. A power strip requires a 20-amp outlet. All Wi-Fi and Electric orders must be submitted by {WIFI_ELECTRIC_DEADLINE}. For a direct tie into main power, labor fees apply; contact the Metropolitan Pavilion coordinator.</Note>
+                <Note>Each 20-amp outlet covers 1,700W at 110V, so order two for 1,800W or more. For a direct tie into main power, labor fees apply; contact the Metropolitan Pavilion coordinator.</Note>
               </div>
             </section>
 
             {/* Wi-Fi */}
             <section ref={(el) => { sectionRefs.current[2] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={3} note={wifiAmount}>Wi-Fi</StepTitle>
+              <StepTitle n={3} note={wifiAmount} deadline={`Order by ${WIFI_ELECTRIC_DEADLINE}`}>Wi-Fi</StepTitle>
               <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">{fmt(WIFI_PER_DEVICE)} per device. Choose how many devices need Wi-Fi (for example, 3 devices is $60).</p>
               <div className="mt-2">
-                <QtyRow label="Wi-Fi Device Access" unitLabel={`${fmt(WIFI_PER_DEVICE)} / device`} value={sel.wifiDevices} lineTotal={wifiAmount} onChange={(v) => setQty("wifiDevices", v)} />
+                <QtyRow label="Wi-Fi device" unitLabel={`${fmt(WIFI_PER_DEVICE)} / device`} value={sel.wifiDevices} lineTotal={wifiAmount} onChange={(v) => setQty("wifiDevices", v)} />
               </div>
             </section>
 
             {/* Lead Retrieval */}
             <section ref={(el) => { sectionRefs.current[3] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={4}>Lead Retrieval App</StepTitle>
+              <StepTitle n={4}>Lead Retrieval</StepTitle>
               <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">Powered by Eventdex. Scan attendee badges and follow up after the show.</p>
               <LeadRetrieval today={today} leadTier={leadTier} leadClosed={leadClosed}
                 checked={sel.leadRetrieval} onToggle={(b) => setSel((p) => ({ ...p, leadRetrieval: b }))} />
@@ -230,11 +227,11 @@ function SummaryCard({ lines, totals, booth, canSubmit, submitting, onContinue }
         {lines.map((l) => {
           const on = l.amount > 0;
           return (
-            <div key={l.key} className="flex items-baseline justify-between gap-3 text-[13.5px]">
-              <span style={{ color: on ? "#3f3a34" : "var(--ink-faint)" }}>
+            <div key={l.key} className="flex items-baseline justify-between gap-3 text-[13.5px] transition-opacity duration-200" style={{ opacity: on ? 1 : 0.4 }}>
+              <span style={{ color: "#3f3a34" }}>
                 {l.label}{on && <span className="text-[color:var(--ink-faint)] text-[12px]"> {l.qty} &times; {fmt(l.unit)}</span>}
               </span>
-              <span className="num w-24 text-right font-medium" style={{ color: on ? "#16130f" : "var(--ink-faint)" }}>{fmt(l.amount)}</span>
+              <span className="num w-24 text-right font-medium" style={{ color: "#16130f" }}>{fmt(l.amount)}</span>
             </div>
           );
         })}
@@ -314,7 +311,7 @@ function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
   if (leadClosed) {
     return (
       <div className="mt-2">
-        <p className="text-[13.5px] text-[color:var(--ink-soft)]">Crowd Pass registration has closed for this event.</p>
+        <p className="text-[13.5px] text-[color:var(--ink-soft)]">Lead Retrieval registration has closed for this event.</p>
         <button onClick={() => setShowPast((s) => !s)}
           className="text-[12px] font-medium mt-1.5 underline underline-offset-2 decoration-stone-300 hover:decoration-stone-500 transition-colors"
           style={{ color: "var(--ink-soft)" }}>
@@ -328,19 +325,16 @@ function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
   return (
     <div className="mt-2">
       <p className="text-[12.5px] text-[color:var(--ink-soft)] mb-4">
-        Crowd Pass pricing rises as the event approaches. Today you pay{" "}
-        <span className="font-semibold num" style={{ color: "var(--emrg-red)" }}>{fmt(leadTier!.price)}</span>.
+        Pricing rises as the event approaches. Today you pay{" "}
+        <span className="font-semibold num" style={{ color: "#16130f" }}>{fmt(leadTier!.price)}</span>. Register early to lock in the lower rate.
       </p>
       <Timeline today={today} />
       <label className="mt-4 flex items-center gap-3 cursor-pointer rounded-xl border px-4 h-14 transition-colors"
-        style={{ borderColor: checked ? "var(--emrg-red)" : "var(--hairline)", background: checked ? "rgba(192,24,42,0.03)" : "transparent" }}>
+        style={{ borderColor: checked ? "#16130f" : "var(--hairline)", background: checked ? "rgba(22,19,15,0.03)" : "transparent" }}>
         <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} className="h-5 w-5" />
         <span className="text-[14px] font-medium">Add Lead Retrieval at today&apos;s price</span>
-        <span className="ml-auto num text-[16px] font-bold" style={{ color: "var(--emrg-red)" }}>{fmt(leadTier!.price)}</span>
+        <span className="ml-auto num text-[16px] font-bold" style={{ color: "#16130f" }}>{fmt(leadTier!.price)}</span>
       </label>
-      <div className="mt-4">
-        <Note>Pricing increases automatically as each sign-up deadline passes. Register early to lock in the lower rate.</Note>
-      </div>
     </div>
   );
 }
@@ -348,8 +342,8 @@ function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
 function Note({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-xl px-4 py-3 text-[12.5px] leading-relaxed"
-      style={{ background: "rgba(192,24,42,0.045)", border: "1px solid rgba(192,24,42,0.16)", color: "var(--ink-soft)" }}>
-      <span className="font-bold" style={{ color: "var(--emrg-red)" }}>Important. </span>{children}
+      style={{ background: "rgba(20,17,15,0.03)", border: "1px solid var(--hairline)", color: "var(--ink-soft)" }}>
+      <span className="font-semibold" style={{ color: "#16130f" }}>Note. </span>{children}
     </div>
   );
 }
@@ -369,8 +363,8 @@ function Timeline({ today }: { today: Date }) {
               opacity: past ? 0.4 : 1,
             }}>
             <div className="text-[9px] font-bold tracking-[0.1em] uppercase mb-1"
-              style={{ color: current ? "var(--emrg-red)" : "var(--ink-faint)" }}>
-              {current ? "Today" : past ? "Closed" : "Soon"}
+              style={{ color: "var(--emrg-red)" }}>
+              {current ? "Today" : " "}
             </div>
             <div className="num text-[15px]" style={{ fontWeight: current ? 700 : 600, color: current ? "var(--emrg-red)" : past ? "var(--ink-faint)" : "#16130f", textDecoration: past ? "line-through" : "none" }}>
               {fmt(tier.price).replace(".00", "")}
@@ -385,12 +379,13 @@ function Timeline({ today }: { today: Date }) {
 
 // ── Primitives ────────────────────────────────────────────────────────────────
 
-function StepTitle({ n, note, children }: { n: number; note?: number; children: React.ReactNode }) {
+function StepTitle({ n, note, deadline, children }: { n: number; note?: number; deadline?: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
       <span className="flex items-center justify-center w-7 h-7 rounded-full text-[12px] font-bold text-white shrink-0 num"
         style={{ background: "linear-gradient(160deg, #2a2521, #0d0b0a)" }}>{n}</span>
       <h2 className="text-[16px] font-bold" style={{ letterSpacing: "-0.01em" }}>{children}</h2>
+      {deadline && <span className="text-[11px] font-medium text-[color:var(--ink-faint)]">{deadline}</span>}
       {note !== undefined && note > 0 && <span className="ml-auto num text-[15px] font-bold">{fmt(note)}</span>}
     </div>
   );
