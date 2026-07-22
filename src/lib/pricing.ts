@@ -6,12 +6,13 @@ export const PROCESSING_FEE_RATE = 0.03; // 3% credit card processing fee, appli
 
 // 2026 event details (from Jessica).
 export const EVENT_INFO = {
-  dates: "October 27 to 29, 2026",
-  venue: "Metropolitan Pavilion, New York",
+  dates: "October 27th-29th, 2026",
+  location: "NYC",                       // short label shown in the header + summary
+  venue: "Metropolitan Pavilion, New York", // full venue, used in guidance notes
 };
 
-// Order deadline for Wi-Fi and Electric (from the exhibitor form).
-export const WIFI_ELECTRIC_DEADLINE = "Friday, October 2";
+// Order deadline for Wi-Fi and Electric (from the exhibitor form). No day-of ordering.
+export const WIFI_ELECTRIC_DEADLINE = "Friday, October 2, 2026";
 
 // ── Electricity ──────────────────────────────────────────────────────────────
 // CONFIRM: 2025 form lists the 20-amp outlet at "$150 per day x days". Treating

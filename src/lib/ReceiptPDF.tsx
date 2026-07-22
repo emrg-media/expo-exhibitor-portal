@@ -3,23 +3,23 @@ import { createElement } from "react";
 import { fmt, PROCESSING_FEE_RATE, type OrderTotals } from "@/lib/pricing";
 
 export interface ReceiptCompany {
-  company: string; contact: string; email: string; phone: string; booth: string;
+  company: string; contact: string; email: string; phone: string;
 }
 
-const C = { red: "#c0182a", black: "#111111", gray: "#57534e", light: "#a8a29e", border: "#d6d3d1", bg: "#fafaf9" };
+const C = { navy: "#000434", black: "#0a0f1f", gray: "#414b61", light: "#8a92a6", border: "#d9deea", bg: "#f7f9ff" };
 
 const s = StyleSheet.create({
   page: { paddingHorizontal: 46, paddingVertical: 44, fontFamily: "Helvetica", fontSize: 10, color: C.black },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
   logo: { width: 150 },
-  title: { fontFamily: "Helvetica-Bold", fontSize: 20, textAlign: "right" },
+  title: { fontFamily: "Helvetica-Bold", fontSize: 20, textAlign: "right", color: C.navy },
   subtitle: { fontSize: 9, color: C.gray, textAlign: "right", marginTop: 3 },
   expo: { fontSize: 9, color: C.light, marginBottom: 20, letterSpacing: 1 },
   label: { fontSize: 8, letterSpacing: 1, color: C.light, marginBottom: 3, fontFamily: "Helvetica-Bold" },
   name: { fontSize: 11, fontFamily: "Helvetica-Bold" },
   line: { fontSize: 9.5, color: C.gray, marginTop: 1 },
   billRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
-  tHead: { flexDirection: "row", backgroundColor: C.black, color: "#fff", paddingVertical: 5, paddingHorizontal: 7 },
+  tHead: { flexDirection: "row", backgroundColor: C.navy, color: "#fff", paddingVertical: 5, paddingHorizontal: 7 },
   th: { fontFamily: "Helvetica-Bold", fontSize: 8, letterSpacing: 0.5 },
   tRow: { flexDirection: "row", borderBottomWidth: 0.75, borderColor: C.border, paddingVertical: 6, paddingHorizontal: 7 },
   cItem: { flex: 1 },
@@ -31,7 +31,7 @@ const s = StyleSheet.create({
   tr: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2.5 },
   trLabel: { fontSize: 10, color: C.gray },
   trVal: { fontSize: 10, textAlign: "right" },
-  grand: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderTopWidth: 1, borderColor: C.black, marginTop: 3 },
+  grand: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderTopWidth: 1, borderColor: C.navy, marginTop: 3 },
   grandLabel: { fontSize: 12, fontFamily: "Helvetica-Bold" },
   grandVal: { fontSize: 12, fontFamily: "Helvetica-Bold", textAlign: "right" },
   footer: { position: "absolute", bottom: 30, left: 46, right: 46, borderTopWidth: 0.75, borderColor: "#e7e5e4", paddingTop: 8, textAlign: "center", fontSize: 8, color: C.light },
@@ -60,12 +60,6 @@ export function ReceiptPDF({ company, totals, logoBase64, dateStr }: {
             {company.email ? <Text style={s.line}>{company.email}</Text> : null}
             {company.phone ? <Text style={s.line}>{company.phone}</Text> : null}
           </View>
-          {company.booth ? (
-            <View>
-              <Text style={s.label}>BOOTH</Text>
-              <Text style={s.name}>{company.booth}</Text>
-            </View>
-          ) : null}
         </View>
 
         <View style={s.tHead}>

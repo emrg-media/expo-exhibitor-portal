@@ -1,28 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f1ec;
-  --foreground: #16130f;
-  --emrg-red: #c0182a;
-  --emrg-red-dark: #9e0f1f;
-  --emrg-red-bright: #d81f34;
-  --emrg-black: #0d0d0d;
-  --ink-soft: #6b625a;
-  --ink-faint: #a8a097;
-  --hairline: rgba(20, 17, 15, 0.08);
+  --background: #f3f6fc;
+  --foreground: #0a0f1f;          /* near-black navy: strong body ink */
+  --brand-navy: #000434;          /* The Event Planner Expo logo navy */
+  --blue: #1b3aa0;                /* primary interactive */
+  --blue-bright: #2b56d8;         /* CTA gradient top / hover / active accent */
+  --blue-dark: #0f2670;           /* CTA gradient bottom / pressed */
+  --ink: #1b2333;                 /* strong body text */
+  --ink-soft: #414b61;            /* secondary text (darkened for legibility) */
+  --ink-faint: #667089;           /* labels / hints (darkened for legibility) */
+  --hairline: rgba(10, 15, 31, 0.13);
   --radius-card: 16px;
   --radius-control: 12px;
-  /* Stripe-style layered elevation: stacked shadows at increasing blur */
+  /* Layered elevation, navy-tinted */
   --elevation:
-    0 0 0 1px rgba(20, 17, 15, 0.04),
-    0 1px 2px rgba(20, 17, 15, 0.04),
-    0 4px 8px -2px rgba(20, 17, 15, 0.05),
-    0 14px 30px -10px rgba(20, 17, 15, 0.12);
+    0 0 0 1px rgba(10, 15, 31, 0.05),
+    0 1px 2px rgba(10, 15, 31, 0.05),
+    0 4px 8px -2px rgba(10, 15, 31, 0.06),
+    0 14px 30px -10px rgba(10, 15, 31, 0.13);
   --elevation-lg:
-    0 0 0 1px rgba(20, 17, 15, 0.05),
-    0 2px 4px rgba(20, 17, 15, 0.05),
-    0 8px 16px -4px rgba(20, 17, 15, 0.07),
-    0 28px 50px -16px rgba(20, 17, 15, 0.22);
+    0 0 0 1px rgba(10, 15, 31, 0.06),
+    0 2px 4px rgba(10, 15, 31, 0.06),
+    0 8px 16px -4px rgba(10, 15, 31, 0.08),
+    0 28px 50px -16px rgba(10, 15, 31, 0.24);
 }
 
 @theme inline {
@@ -33,21 +34,20 @@
 }
 
 body {
-  /* Material beige: a soft radial light source near the top where the hero ends,
-     a barely-there vertical drift, and fine grain on top so it reads as paper. */
-  background-color: #f1eee7;
+  /* Cool off-white: a soft light source near the top, a whisper of grain. */
+  background-color: #f3f6fc;
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E"),
-    radial-gradient(1200px 620px at 50% 0%, #fbf9f4 0%, rgba(251, 249, 244, 0) 58%),
-    linear-gradient(180deg, #f4f1ea 0%, #edeae2 100%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E"),
+    radial-gradient(1200px 620px at 50% 0%, #ffffff 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(180deg, #f5f8fd 0%, #eaf0f9 100%);
   background-repeat: repeat, no-repeat, no-repeat;
   background-size: 180px 180px, 100% 100%, 100% 100%;
   background-attachment: fixed, fixed, fixed;
   color: var(--foreground);
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Numerals read as financial software: mono, tabular, aligned */
 /* Mono numerals: strictly for the price column, totals, and hero metadata */
 .num {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
@@ -63,34 +63,42 @@ body {
   border-radius: var(--radius-card);
   box-shadow: var(--elevation);
 }
+/* Lead Retrieval: set apart with a navy frame and a faint blue wash */
+.lead-card {
+  background: linear-gradient(180deg, #f7f9ff 0%, #ffffff 42%);
+  border-radius: var(--radius-card);
+  border: 1.5px solid var(--brand-navy);
+  box-shadow: var(--elevation-lg);
+}
 .hairline { border-color: var(--hairline); }
 
-/* Hero: layered radial light over near-black, plus a faint grain */
+/* Hero: deep Expo navy with a soft blue glow */
 .hero-gradient {
   position: relative;
   background:
-    radial-gradient(520px 300px at 84% -20%, rgba(216, 31, 52, 0.34), transparent 60%),
-    radial-gradient(700px 400px at 12% 120%, rgba(216, 31, 52, 0.10), transparent 60%),
-    linear-gradient(155deg, #1c1815 0%, #100d0b 55%, #060504 100%);
+    radial-gradient(520px 300px at 84% -20%, rgba(43, 86, 216, 0.32), transparent 60%),
+    radial-gradient(700px 400px at 12% 120%, rgba(43, 86, 216, 0.14), transparent 60%),
+    linear-gradient(155deg, #0a1030 0%, #050826 52%, #000418 100%);
 }
 .hero-gradient::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.5;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.3'/%3E%3C/svg%3E");
   mix-blend-mode: overlay;
 }
 
 .cta-gradient {
-  background: linear-gradient(180deg, var(--emrg-red-bright) 0%, var(--emrg-red) 55%, var(--emrg-red-dark) 100%);
-  box-shadow: 0 1px 1px rgba(255, 255, 255, 0.25) inset, 0 10px 24px -8px rgba(192, 24, 42, 0.55);
+  background: linear-gradient(180deg, var(--blue-bright) 0%, var(--blue) 55%, var(--blue-dark) 100%);
+  box-shadow: 0 1px 1px rgba(255, 255, 255, 0.22) inset, 0 10px 24px -8px rgba(27, 58, 160, 0.5);
   border: 1px solid transparent;
+  color: #ffffff;
   transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.14s ease,
               background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.cta-gradient:not(:disabled):hover { filter: brightness(1.05); transform: translateY(-1px); }
+.cta-gradient:not(:disabled):hover { filter: brightness(1.06); transform: translateY(-1px); }
 .cta-gradient:not(:disabled):active { transform: translateY(0) scale(0.99); }
 /* Ghost while inert: hairline outline, no fill, muted text. Snaps to the gradient on enable. */
 .cta-gradient:disabled {
@@ -104,20 +112,25 @@ body {
 .spring { transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.12s ease; }
 .spring:not(:disabled):active { transform: scale(0.86); }
 
+/* Clickable hero step chips */
+.step-chip { transition: color 0.2s ease, opacity 0.2s ease; cursor: pointer; background: none; border: none; padding: 0; }
+.step-chip:hover { opacity: 0.85; }
+
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1ccc5; border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: #c3ccdd; border-radius: 99px; }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--emrg-red) !important;
-  box-shadow: 0 0 0 3px rgba(192, 24, 42, 0.14);
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(27, 58, 160, 0.16);
 }
-input.invalid { border-color: var(--emrg-red) !important; }
-input.invalid:focus { box-shadow: 0 0 0 3px rgba(192, 24, 42, 0.14); }
+/* Validation error: navy emphasis (no red anywhere in the palette) */
+input.invalid { border-color: var(--brand-navy) !important; box-shadow: 0 0 0 3px rgba(0, 4, 52, 0.12); }
+input.invalid:focus { border-color: var(--brand-navy) !important; box-shadow: 0 0 0 3px rgba(0, 4, 52, 0.16); }
 
-input[type="checkbox"] { accent-color: var(--emrg-red); cursor: pointer; }
+input[type="checkbox"] { accent-color: var(--blue); cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
-  .cta-gradient, .spring { transition: none; }
+  .cta-gradient, .spring, .step-chip { transition: none; }
 }

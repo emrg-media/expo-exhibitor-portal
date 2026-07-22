@@ -10,14 +10,28 @@ import { useCountUp, formatPhone, isValidEmail } from "@/lib/ui";
 
 const STEPS = ["Company", "Electric", "Wi-Fi", "Lead Retrieval"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const INTRO = "Enhance your Expo experience by ordering any additional services you may need, including electric, Wi-Fi, and lead retrieval. Please select your items below and submit your order form in advance to ensure everything is ready when you arrive at the Expo. Please follow all deadline dates.";
+
 function shortEnd(end: string): string {
   const [, m, d] = end.split("-").map(Number);
   return `${MONTHS[m - 1]} ${d}`;
 }
 
+// Days remaining (inclusive of today and the tier's last day) at the current rate.
+function daysLeftInTier(today: Date, endStr: string): number {
+  const [y, m, d] = endStr.split("-").map(Number);
+  const end = new Date(y, m - 1, d);
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((end.getTime() - t0.getTime()) / 86400000) + 1;
+}
+
+const DATE_VENUE = `${EVENT_INFO.dates} / ${EVENT_INFO.location}`;
+
 export default function BoothServicesPage() {
   const [today, setToday] = useState<Date>(() => new Date());
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    setMounted(true);
     const p = new URLSearchParams(window.location.search).get("preview");
     if (p && /^\d{4}-\d{2}-\d{2}$/.test(p)) {
       const [y, m, d] = p.split("-").map(Number);
@@ -25,8 +39,11 @@ export default function BoothServicesPage() {
     }
   }, []);
 
-  const [company, setCompany] = useState({ company: "", contact: "", email: "", phone: "", booth: "" });
+  const [company, setCompany] = useState({ company: "", contact: "", email: "", phone: "" });
   const [emailTouched, setEmailTouched] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const companyRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
 
   // Scroll-spy: light up the step in the hero as each section crosses the viewport center.
   const [activeStep, setActiveStep] = useState(0);
@@ -43,8 +60,12 @@ export default function BoothServicesPage() {
     sectionRefs.current.forEach((el) => el && obs.observe(el));
     return () => obs.disconnect();
   }, []);
+
   const [sel, setSel] = useState<OrderSelection>({ amp20Qty: 0, powerStripQty: 0, wifiDevices: 0, leadRetrieval: false });
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
+  const [phase, setPhase] = useState<"form" | "confirmed">("form");
+  const [receipt, setReceipt] = useState<{ url: string; company: typeof company; totals: OrderTotals } | null>(null);
 
   const totals = computeOrder(sel, today);
   const leadTier = currentLeadTier(today);
@@ -65,15 +86,35 @@ export default function BoothServicesPage() {
     ...(!leadClosed ? [{ key: "lead", label: "Lead Retrieval", qty: sel.leadRetrieval ? 1 : 0, unit: leadTier!.price, amount: sel.leadRetrieval ? leadTier!.price : 0 }] : []),
   ];
 
-  const emailInvalid = emailTouched && company.email.trim().length > 0 && !isValidEmail(company.email);
-  const canSubmit = !!company.company.trim() && isValidEmail(company.email) && totals.lines.length > 0 && !submitting;
+  const companyMissing = !company.company.trim();
+  const emailMissing = !company.email.trim();
+  const emailBad = company.email.trim().length > 0 && !isValidEmail(company.email);
+  const companyError = attempted && companyMissing ? "Company name is required" : undefined;
+  const emailError = (emailTouched || attempted)
+    ? (emailMissing ? "Email is required" : emailBad ? "Enter a valid email address" : undefined)
+    : undefined;
+
+  const hasService = totals.lines.length > 0;
+  const formValid = !companyMissing && isValidEmail(company.email) && hasService;
 
   function setQty(key: keyof OrderSelection, v: number) {
     setSel((p) => ({ ...p, [key]: Math.max(0, v) }));
   }
 
+  function scrollToStep(i: number) {
+    sectionRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function handleContinue() {
-    if (!canSubmit) return;
+    if (submitting || !hasService) return;
+    if (!formValid) {
+      setAttempted(true);
+      const target = companyMissing ? companyRef.current : emailRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => target?.focus({ preventScroll: true }), 350);
+      return;
+    }
+    setSubmitError(false);
     setSubmitting(true);
     try {
       const res = await fetch("/api/order", {
@@ -84,11 +125,26 @@ export default function BoothServicesPage() {
       if (!res.ok) throw new Error("Order failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = "expo-booth-services-receipt.pdf"; a.click();
-      URL.revokeObjectURL(url);
-    } catch { /* noop */ } finally { setSubmitting(false); }
+      setReceipt({ url, company: { ...company }, totals });
+      setPhase("confirmed");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      setSubmitError(true);
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  function resetOrder() {
+    if (receipt) URL.revokeObjectURL(receipt.url);
+    setReceipt(null);
+    setPhase("form");
+    setSel({ amp20Qty: 0, powerStripQty: 0, wifiDevices: 0, leadRetrieval: false });
+    setAttempted(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  const daysLeft = mounted && leadTier ? daysLeftInTier(today, leadTier.end) : null;
 
   return (
     <div className="min-h-screen pb-24 lg:pb-10">
@@ -96,109 +152,179 @@ export default function BoothServicesPage() {
       <header className="hero-gradient text-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-6 md:px-8 pt-12 pb-16 relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-16 md:h-20 w-auto mb-7" style={{ filter: "brightness(0) invert(1)" }} />
-          <h1 className="text-[36px] md:text-[46px] font-bold leading-[1.02]" style={{ letterSpacing: "-0.03em" }}>Booth Services</h1>
-          <p className="text-[14.5px] text-white/55 mt-3 max-w-md leading-relaxed">
-            Order electricity, Wi-Fi, and lead retrieval for your booth. Pay securely and get an instant receipt by email.
+          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-16 md:h-20 w-auto mb-5" style={{ filter: "brightness(0) invert(1)" }} />
+          <p className="text-[16px] md:text-[18px] font-semibold text-white/90 mb-6" style={{ letterSpacing: "0.01em" }}>
+            <span className="num">{EVENT_INFO.dates}</span> <span className="text-white/45 mx-1">/</span> {EVENT_INFO.location}
           </p>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-5 text-[12.5px] text-white/50">
-            <span className="num">{EVENT_INFO.dates}</span>
-            <span className="w-1 h-1 rounded-full bg-white/25" />
-            <span>{EVENT_INFO.venue}</span>
-          </div>
-          {/* Step indicator */}
-          <div className="flex items-center gap-2.5 mt-7">
-            {STEPS.map((s, i) => {
-              const current = i === activeStep;
-              const done = i < activeStep;
-              return (
-                <div key={s} className="flex items-center gap-2.5">
-                  <span className="flex items-center gap-1.5 text-[11px] tracking-wide transition-colors"
-                    style={{ color: current ? "#fff" : done ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.38)", fontWeight: current ? 600 : 400 }}>
-                    {current && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#fff" }} />}
-                    <span className="tnum">{i + 1}</span> {s}
-                  </span>
-                  {i < STEPS.length - 1 && <span className="w-6 h-px" style={{ background: "rgba(255,255,255,0.12)" }} />}
-                </div>
-              );
-            })}
-          </div>
+          <h1 className="text-[36px] md:text-[46px] font-bold leading-[1.02]" style={{ letterSpacing: "-0.03em" }}>Booth Services</h1>
+
+          {phase === "form" && (
+            <>
+              <p className="text-[15px] md:text-[15.5px] text-white/75 mt-4 max-w-2xl leading-relaxed">{INTRO}</p>
+              {/* Step indicator (clickable for back/forward navigation) */}
+              <div className="flex flex-wrap items-center gap-2.5 mt-7">
+                {STEPS.map((s, i) => {
+                  const current = i === activeStep;
+                  const done = i < activeStep;
+                  return (
+                    <div key={s} className="flex items-center gap-2.5">
+                      <button type="button" onClick={() => scrollToStep(i)}
+                        className="step-chip flex items-center gap-1.5 text-[12.5px] tracking-wide"
+                        style={{ color: current ? "#fff" : done ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.5)", fontWeight: current ? 600 : 500 }}>
+                        {current && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#fff" }} />}
+                        <span className="tnum">{i + 1}</span> {s}
+                      </button>
+                      {i < STEPS.length - 1 && <span className="w-6 h-px" style={{ background: "rgba(255,255,255,0.16)" }} />}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 md:px-8 pt-8">
-        <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
+      {phase === "confirmed" && receipt ? (
+        <Confirmation receipt={receipt} onReset={resetOrder} />
+      ) : (
+        <div className="max-w-5xl mx-auto px-6 md:px-8 pt-8">
+          <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
 
-          {/* Left: form */}
-          <div className="space-y-5">
-            {/* Company */}
-            <section ref={(el) => { sectionRefs.current[0] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={1}>Your Company</StepTitle>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
-                <Field label="Company name" required value={company.company} onChange={(v) => setCompany({ ...company, company: v })} placeholder="Acme Events" />
-                <Field label="Booth number" value={company.booth} onChange={(v) => setCompany({ ...company, booth: v })} placeholder="e.g. 214" />
-                <Field label="Contact name" value={company.contact} onChange={(v) => setCompany({ ...company, contact: v })} placeholder="Jane Smith" />
-                <Field label="Phone" value={company.phone} onChange={(v) => setCompany({ ...company, phone: formatPhone(v) })} placeholder="(212) 555-0100" />
-                <div className="sm:col-span-2">
-                  <Field label="Email" required value={company.email}
+            {/* Left: form */}
+            <div className="space-y-5">
+              {/* Countdown chip */}
+              {daysLeft !== null && daysLeft > 0 && (
+                <div className="flex items-center gap-2.5 rounded-full w-fit px-4 py-2 text-[13px] font-semibold"
+                  style={{ background: "rgba(27,58,160,0.07)", border: "1px solid rgba(27,58,160,0.22)", color: "var(--brand-navy)" }}>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="8" cy="8.5" r="6" stroke="currentColor" strokeWidth="1.4" />
+                    <path d="M8 5.2v3.4l2.1 1.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {daysLeft} {daysLeft === 1 ? "day" : "days"} left at this rate
+                  <span className="font-medium text-[color:var(--ink-soft)]">· Lead Retrieval</span>
+                </div>
+              )}
+
+              {/* Company */}
+              <section ref={(el) => { sectionRefs.current[0] = el; }} className="premium-card p-6 md:p-7">
+                <StepTitle n={1}>Your Company</StepTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
+                  <Field label="Company name" required value={company.company} inputRef={companyRef}
+                    onChange={(v) => setCompany({ ...company, company: v })}
+                    invalid={!!companyError} error={companyError} placeholder="Acme Events" />
+                  <Field label="Contact name" value={company.contact} onChange={(v) => setCompany({ ...company, contact: v })} placeholder="Jane Smith" />
+                  <Field label="Cell phone" value={company.phone} onChange={(v) => setCompany({ ...company, phone: formatPhone(v) })} placeholder="(212) 555-0100" />
+                  <Field label="Email" required value={company.email} inputRef={emailRef}
                     onChange={(v) => setCompany({ ...company, email: v })}
                     onBlur={() => setEmailTouched(true)}
-                    invalid={emailInvalid} error={emailInvalid ? "Enter a valid email address" : undefined}
+                    invalid={!!emailError} error={emailError}
                     placeholder="jane@acme.com" />
                 </div>
-              </div>
-            </section>
+              </section>
 
-            {/* Electricity */}
-            <section ref={(el) => { sectionRefs.current[1] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={2} note={electricitySubtotal} deadline={`Order by ${WIFI_ELECTRIC_DEADLINE}`}>Electric</StepTitle>
-              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">A 20-amp outlet is required before adding a power strip.</p>
-              <div className="mt-2">
-                <QtyRow label="20-amp outlet" unitLabel={`${fmt(amp20Unit)} / outlet`} value={sel.amp20Qty} lineTotal={amp20Amount}
-                  onChange={(v) => setSel((p) => ({ ...p, amp20Qty: Math.max(0, v), powerStripQty: v <= 0 ? 0 : p.powerStripQty }))} />
-                <QtyRow label="Power strip"
-                  unitLabel={powerStripLocked ? `${fmt(ELECTRIC.powerStripPrice)} / cord. Add an outlet first.` : `${fmt(ELECTRIC.powerStripPrice)} / cord`}
-                  value={sel.powerStripQty} lineTotal={stripAmount} disabled={powerStripLocked} onChange={(v) => setQty("powerStripQty", v)} />
-              </div>
-              <div className="mt-4">
-                <Note>Each 20-amp outlet covers 1,700W at 110V, so order two for 1,800W or more. For a direct tie into main power, labor fees apply; contact the Metropolitan Pavilion coordinator.</Note>
-              </div>
-            </section>
+              {/* Electric */}
+              <section ref={(el) => { sectionRefs.current[1] = el; }} className="premium-card p-6 md:p-7">
+                <StepTitle n={2} note={electricitySubtotal} deadline={`Order by ${WIFI_ELECTRIC_DEADLINE}`}>Electric</StepTitle>
+                <p className="text-[14px] text-[color:var(--ink-soft)] mt-2 leading-relaxed">
+                  If you are planning to use any type of electrical device in your booth, you must submit an electric order in advance. You will not be able to order electric day of event.
+                </p>
+                <div className="mt-3">
+                  <QtyRow label="20-amp outlet" unitLabel={`${fmt(amp20Unit)} / outlet`} value={sel.amp20Qty} lineTotal={amp20Amount}
+                    onChange={(v) => setSel((p) => ({ ...p, amp20Qty: Math.max(0, v), powerStripQty: v <= 0 ? 0 : p.powerStripQty }))} />
+                  <QtyRow label="Power strip"
+                    unitLabel={powerStripLocked ? `${fmt(ELECTRIC.powerStripPrice)} / cord. Add an outlet first.` : `${fmt(ELECTRIC.powerStripPrice)} / cord`}
+                    value={sel.powerStripQty} lineTotal={stripAmount} disabled={powerStripLocked} onChange={(v) => setQty("powerStripQty", v)} />
+                </div>
+                <div className="mt-4">
+                  <Note>Each 20-amp outlet covers 1,700W at 110V, so order two for 1,800W or more. For a direct tie into main power, labor fees apply; contact the Metropolitan Pavilion coordinator.</Note>
+                </div>
+              </section>
 
-            {/* Wi-Fi */}
-            <section ref={(el) => { sectionRefs.current[2] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={3} note={wifiAmount} deadline={`Order by ${WIFI_ELECTRIC_DEADLINE}`}>Wi-Fi</StepTitle>
-              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">{fmt(WIFI_PER_DEVICE)} per device. Choose how many devices need Wi-Fi (for example, 3 devices is $60).</p>
-              <div className="mt-2">
-                <QtyRow label="Wi-Fi device" unitLabel={`${fmt(WIFI_PER_DEVICE)} / device`} value={sel.wifiDevices} lineTotal={wifiAmount} onChange={(v) => setQty("wifiDevices", v)} />
+              {/* Wi-Fi */}
+              <section ref={(el) => { sectionRefs.current[2] = el; }} className="premium-card p-6 md:p-7">
+                <StepTitle n={3} note={wifiAmount} deadline={`Order by ${WIFI_ELECTRIC_DEADLINE}`}>Wi-Fi</StepTitle>
+                <p className="text-[14px] text-[color:var(--ink-soft)] mt-2 leading-relaxed">{fmt(WIFI_PER_DEVICE)} per device. Choose how many devices need Wi-Fi (for example, 3 devices is $60).</p>
+                <div className="mt-3">
+                  <QtyRow label="Wi-Fi device" unitLabel={`${fmt(WIFI_PER_DEVICE)} / device`} value={sel.wifiDevices} lineTotal={wifiAmount} onChange={(v) => setQty("wifiDevices", v)} />
+                </div>
+              </section>
+
+              {/* Lead Retrieval (set apart in its own framed card) */}
+              <section ref={(el) => { sectionRefs.current[3] = el; }} className="lead-card p-7 md:p-8">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-bold text-white shrink-0 num"
+                    style={{ background: "linear-gradient(160deg, #12307e, #000434)" }}>4</span>
+                  <h2 className="text-[21px] font-bold" style={{ letterSpacing: "-0.015em", color: "var(--brand-navy)" }}>Lead Retrieval</h2>
+                </div>
+                <p className="text-[14px] text-[color:var(--ink-soft)] mt-3 leading-relaxed">Scan attendee badges and follow up after the show.</p>
+                <LeadRetrieval today={today} leadTier={leadTier} leadClosed={leadClosed}
+                  checked={sel.leadRetrieval} onToggle={(b) => setSel((p) => ({ ...p, leadRetrieval: b }))} />
+              </section>
+
+              {/* Mobile summary (in flow) */}
+              <div className="lg:hidden">
+                <SummaryCard lines={summaryLines} totals={totals} hasService={hasService} submitting={submitting} submitError={submitError} onContinue={handleContinue} />
               </div>
-            </section>
-
-            {/* Lead Retrieval */}
-            <section ref={(el) => { sectionRefs.current[3] = el; }} className="premium-card p-6 md:p-7">
-              <StepTitle n={4}>Lead Retrieval</StepTitle>
-              <p className="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">Powered by Eventdex. Scan attendee badges and follow up after the show.</p>
-              <LeadRetrieval today={today} leadTier={leadTier} leadClosed={leadClosed}
-                checked={sel.leadRetrieval} onToggle={(b) => setSel((p) => ({ ...p, leadRetrieval: b }))} />
-            </section>
-
-            {/* Mobile summary (in flow) */}
-            <div className="lg:hidden">
-              <SummaryCard lines={summaryLines} totals={totals} booth={company.booth} canSubmit={canSubmit} submitting={submitting} onContinue={handleContinue} />
             </div>
+
+            {/* Right: sticky summary (desktop) */}
+            <aside className="hidden lg:block lg:sticky lg:top-6">
+              <SummaryCard lines={summaryLines} totals={totals} hasService={hasService} submitting={submitting} submitError={submitError} onContinue={handleContinue} />
+            </aside>
           </div>
 
-          {/* Right: sticky summary (desktop) */}
-          <aside className="hidden lg:block lg:sticky lg:top-6">
-            <SummaryCard lines={summaryLines} totals={totals} booth={company.booth} canSubmit={canSubmit} submitting={submitting} onContinue={handleContinue} />
-          </aside>
+          <p className="text-center text-[12px] text-[color:var(--ink-faint)] pt-6 pb-4">EMRG Media &nbsp;·&nbsp; The Event Planner Expo &nbsp;·&nbsp; forms@theeventplannerexpo.com</p>
         </div>
-
-        <p className="text-center text-[11px] text-[color:var(--ink-faint)] pt-6 pb-4">EMRG Media &nbsp;·&nbsp; The Event Planner Expo &nbsp;·&nbsp; forms@theeventplannerexpo.com</p>
-      </div>
+      )}
 
       {/* Mobile sticky bottom bar */}
-      <MobileBar total={totals.total} canSubmit={canSubmit} submitting={submitting} onContinue={handleContinue} />
+      {phase === "form" && <MobileBar total={totals.total} hasService={hasService} submitting={submitting} onContinue={handleContinue} />}
+    </div>
+  );
+}
+
+// ── Confirmation ──────────────────────────────────────────────────────────────
+
+function Confirmation({ receipt, onReset }: { receipt: { url: string; company: { company: string; email: string }; totals: OrderTotals }; onReset: () => void }) {
+  const { totals } = receipt;
+  return (
+    <div className="max-w-xl mx-auto px-6 md:px-8 pt-10">
+      <div className="premium-card p-7 md:p-9 text-center">
+        <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(27,58,160,0.09)" }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4.3L19 7.3" stroke="var(--blue)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </div>
+        <h1 className="text-[24px] font-bold mt-5" style={{ letterSpacing: "-0.02em", color: "var(--brand-navy)" }}>Order confirmed</h1>
+        <p className="text-[14.5px] text-[color:var(--ink-soft)] mt-2 leading-relaxed">
+          Thank you{receipt.company.company ? `, ${receipt.company.company.replace(/[.\s]+$/, "")}` : ""}. Your booth add-on order for The Event Planner Expo 2026 has been submitted.
+        </p>
+
+        <div className="mt-6 rounded-xl px-5 py-4 text-left" style={{ border: "1px solid var(--hairline)" }}>
+          {totals.lines.map((l) => (
+            <div key={l.key} className="flex items-baseline justify-between gap-3 text-[14px] py-1">
+              <span style={{ color: "var(--ink)" }}>{l.label} <span className="text-[color:var(--ink-faint)] text-[12.5px]">{l.qty} &times; {fmt(l.unit)}</span></span>
+              <span className="num font-semibold" style={{ color: "var(--foreground)" }}>{fmt(l.amount)}</span>
+            </div>
+          ))}
+          <div className="flex items-baseline justify-between pt-3 mt-2" style={{ borderTop: "1px solid var(--hairline)" }}>
+            <span className="text-[15px] font-bold">Total paid</span>
+            <span className="num text-[20px] font-bold">{fmt(totals.total)}</span>
+          </div>
+        </div>
+
+        <p className="text-[13px] text-[color:var(--ink-soft)] mt-5">
+          A confirmation email {receipt.company.email ? <>is on its way to <span className="font-semibold text-[color:var(--foreground)]">{receipt.company.email}</span></> : "is on its way"} with your receipt attached.
+        </p>
+
+        <a href={receipt.url} download="expo-booth-services-receipt.pdf"
+          className="cta-gradient inline-flex items-center justify-center gap-2 w-full mt-6 h-12 text-[13.5px] font-bold tracking-[0.14em] uppercase rounded-xl">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l3-3m-3 3L5 7M3 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Download receipt (PDF)
+        </a>
+        <button onClick={onReset} className="mt-4 text-[13px] font-medium underline underline-offset-2 decoration-stone-300 hover:decoration-stone-500 transition-colors" style={{ color: "var(--ink-soft)" }}>
+          Place another order
+        </button>
+      </div>
+      <p className="text-center text-[12px] text-[color:var(--ink-faint)] pt-6 pb-4">EMRG Media &nbsp;·&nbsp; The Event Planner Expo &nbsp;·&nbsp; forms@theeventplannerexpo.com</p>
     </div>
   );
 }
@@ -207,53 +333,51 @@ export default function BoothServicesPage() {
 
 type SummaryLine = { key: string; label: string; qty: number; unit: number; amount: number };
 
-function SummaryCard({ lines, totals, booth, canSubmit, submitting, onContinue }: {
-  lines: SummaryLine[]; totals: OrderTotals; booth: string; canSubmit: boolean; submitting: boolean; onContinue: () => void;
+function SummaryCard({ lines, totals, hasService, submitting, submitError, onContinue }: {
+  lines: SummaryLine[]; totals: OrderTotals; hasService: boolean; submitting: boolean; submitError: boolean; onContinue: () => void;
 }) {
   const animTotal = useCountUp(totals.total);
   return (
     <div className="premium-card p-6" style={{ boxShadow: "var(--elevation-lg)" }}>
-      <p className="text-[11px] font-bold tracking-[0.2em] uppercase text-[color:var(--ink-soft)]">Order Summary</p>
+      <p className="text-[12px] font-bold tracking-[0.2em] uppercase text-[color:var(--ink-soft)]">Order Summary</p>
 
       {/* Event context, so the summary reads like a receipt from the first glance */}
-      <div className="mt-3 pb-3.5 text-[12px] text-[color:var(--ink-soft)] flex flex-wrap items-center gap-x-2 gap-y-0.5" style={{ borderBottom: "1px solid var(--hairline)" }}>
-        <span className="num">{EVENT_INFO.dates}</span>
-        <span className="w-1 h-1 rounded-full" style={{ background: "var(--ink-faint)" }} />
-        <span>{EVENT_INFO.venue}</span>
-        {booth.trim() && <><span className="w-1 h-1 rounded-full" style={{ background: "var(--ink-faint)" }} /><span>Booth <span className="num font-medium text-stone-700">{booth}</span></span></>}
+      <div className="mt-3 pb-3.5 text-[14px] font-semibold" style={{ borderBottom: "1px solid var(--hairline)", color: "var(--ink)" }}>
+        <span className="num">{EVENT_INFO.dates}</span> <span className="text-[color:var(--ink-faint)] mx-0.5">/</span> {EVENT_INFO.location}
       </div>
 
       <div className="mt-3.5 space-y-2.5">
         {lines.map((l) => {
           const on = l.amount > 0;
           return (
-            <div key={l.key} className="flex items-baseline justify-between gap-3 text-[13.5px] transition-opacity duration-200" style={{ opacity: on ? 1 : 0.4 }}>
-              <span style={{ color: "#3f3a34" }}>
-                {l.label}{on && <span className="text-[color:var(--ink-faint)] text-[12px]"> {l.qty} &times; {fmt(l.unit)}</span>}
+            <div key={l.key} className="flex items-baseline justify-between gap-3 text-[14.5px] transition-opacity duration-200" style={{ opacity: on ? 1 : 0.4 }}>
+              <span style={{ color: "var(--ink)" }}>
+                {l.label}{on && <span className="text-[color:var(--ink-faint)] text-[12.5px]"> {l.qty} &times; {fmt(l.unit)}</span>}
               </span>
-              <span className="num w-24 text-right font-medium" style={{ color: "#16130f" }}>{fmt(l.amount)}</span>
+              <span className="num w-24 text-right font-semibold" style={{ color: "var(--foreground)" }}>{fmt(l.amount)}</span>
             </div>
           );
         })}
         <div className="pt-3 mt-1 space-y-1.5" style={{ borderTop: "1px solid var(--hairline)" }}>
-          <div className="flex justify-between text-[13px] text-[color:var(--ink-soft)]"><span>Subtotal</span><span className="num">{fmt(totals.subtotal)}</span></div>
-          <div className="flex justify-between text-[13px] text-[color:var(--ink-soft)]"><span>Processing fee ({(PROCESSING_FEE_RATE * 100).toFixed(0)}%)</span><span className="num">{fmt(totals.fee)}</span></div>
-          <div className="flex justify-between items-baseline pt-2"><span className="text-[15px] font-bold">Total</span><span className="num text-[24px] font-bold" style={{ letterSpacing: "-0.02em" }}>{fmt(animTotal)}</span></div>
+          <div className="flex justify-between text-[13.5px] text-[color:var(--ink-soft)]"><span>Subtotal</span><span className="num">{fmt(totals.subtotal)}</span></div>
+          <div className="flex justify-between text-[13.5px] text-[color:var(--ink-soft)]"><span>Processing fee ({(PROCESSING_FEE_RATE * 100).toFixed(0)}%)</span><span className="num">{fmt(totals.fee)}</span></div>
+          <div className="flex justify-between items-baseline pt-2"><span className="text-[15px] font-bold">Total</span><span className="num text-[26px] font-bold" style={{ letterSpacing: "-0.02em" }}>{fmt(animTotal)}</span></div>
         </div>
       </div>
 
-      <button onClick={onContinue} disabled={!canSubmit}
-        className="cta-gradient w-full mt-5 h-12 flex items-center justify-center gap-2 text-[13px] font-bold tracking-[0.16em] uppercase rounded-xl">
+      <button onClick={onContinue} disabled={!hasService || submitting}
+        className="cta-gradient w-full mt-5 h-12 flex items-center justify-center gap-2 text-[13.5px] font-bold tracking-[0.16em] uppercase rounded-xl">
         {submitting ? <><Spinner /> Processing</> : "Continue to Payment"}
       </button>
+      {submitError && <p className="text-[12.5px] text-center mt-2.5 font-medium" style={{ color: "var(--brand-navy)" }}>Something went wrong submitting your order. Please try again.</p>}
 
       <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--hairline)" }}>
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-[color:var(--ink-faint)] mb-3">
+        <div className="flex items-center justify-center gap-1.5 text-[11.5px] text-[color:var(--ink-faint)] mb-3">
           <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 7V5a4 4 0 0 1 8 0v2m-9 0h10v7H3V7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
           Secure checkout. Receipt emailed instantly.
         </div>
         <CardMarks />
-        <p className="text-center text-[10px] text-[color:var(--ink-faint)] mt-2.5">Powered by <span className="font-semibold text-stone-500">Stripe</span></p>
+        <p className="text-center text-[10.5px] text-[color:var(--ink-faint)] mt-2.5">Powered by <span className="font-semibold text-[color:var(--ink-soft)]">Stripe</span></p>
       </div>
     </div>
   );
@@ -261,40 +385,40 @@ function SummaryCard({ lines, totals, booth, canSubmit, submitting, onContinue }
 
 function CardMarks() {
   return (
-    <div className="flex items-center justify-center gap-3.5" style={{ opacity: 0.55 }}>
+    <div className="flex items-center justify-center gap-3.5" style={{ opacity: 0.6 }}>
       {/* Visa */}
-      <svg viewBox="0 0 40 14" height="12" aria-label="Visa"><text x="0" y="12" fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight="800" fontSize="14" letterSpacing="-0.5" fill="#5f574f">VISA</text></svg>
+      <svg viewBox="0 0 40 14" height="12" aria-label="Visa"><text x="0" y="12" fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight="800" fontSize="14" letterSpacing="-0.5" fill="#4a5268">VISA</text></svg>
       {/* Mastercard */}
       <svg viewBox="0 0 34 22" height="17" aria-label="Mastercard">
-        <circle cx="13" cy="11" r="10" fill="#6f665d" />
-        <circle cx="21" cy="11" r="10" fill="#9a9188" />
-        <path d="M17 3.2a9.98 9.98 0 0 0 0 15.6 9.98 9.98 0 0 0 0-15.6z" fill="#7d746b" />
+        <circle cx="13" cy="11" r="10" fill="#5b647c" />
+        <circle cx="21" cy="11" r="10" fill="#98a0b4" />
+        <path d="M17 3.2a9.98 9.98 0 0 0 0 15.6 9.98 9.98 0 0 0 0-15.6z" fill="#767f97" />
       </svg>
       {/* Amex */}
-      <svg viewBox="0 0 42 13" height="11" aria-label="American Express"><text x="0" y="11" fontFamily="Arial, Helvetica, sans-serif" fontWeight="800" fontSize="11" fill="#5f574f">AMEX</text></svg>
+      <svg viewBox="0 0 42 13" height="11" aria-label="American Express"><text x="0" y="11" fontFamily="Arial, Helvetica, sans-serif" fontWeight="800" fontSize="11" fill="#4a5268">AMEX</text></svg>
       {/* Apple Pay */}
       <span className="flex items-center gap-0.5" aria-label="Apple Pay">
-        <svg viewBox="0 0 18 20" height="15" fill="#5f574f"><path d="M12.4 2.9c.5-.6.8-1.5.7-2.4-.8 0-1.7.5-2.2 1.2-.5.6-.9 1.4-.8 2.3.9.1 1.7-.5 2.3-1.1zM13.3 4.8c-1.2-.1-2.3.7-2.9.7-.6 0-1.5-.7-2.5-.7-1.3 0-2.4.7-3.1 1.9-1.3 2.3-.3 5.7 1 7.5.6.9 1.3 1.9 2.3 1.9.9 0 1.2-.6 2.3-.6 1.1 0 1.4.6 2.4.6 1 0 1.6-.9 2.2-1.8.7-1 1-2 1-2-.02-.01-1.9-.74-1.9-2.9 0-1.8 1.5-2.7 1.5-2.7-.8-1.2-2.1-1.4-2.5-1.4z" /></svg>
-        <span className="text-[13px] font-semibold" style={{ color: "#5f574f" }}>Pay</span>
+        <svg viewBox="0 0 18 20" height="15" fill="#4a5268"><path d="M12.4 2.9c.5-.6.8-1.5.7-2.4-.8 0-1.7.5-2.2 1.2-.5.6-.9 1.4-.8 2.3.9.1 1.7-.5 2.3-1.1zM13.3 4.8c-1.2-.1-2.3.7-2.9.7-.6 0-1.5-.7-2.5-.7-1.3 0-2.4.7-3.1 1.9-1.3 2.3-.3 5.7 1 7.5.6.9 1.3 1.9 2.3 1.9.9 0 1.2-.6 2.3-.6 1.1 0 1.4.6 2.4.6 1 0 1.6-.9 2.2-1.8.7-1 1-2 1-2-.02-.01-1.9-.74-1.9-2.9 0-1.8 1.5-2.7 1.5-2.7-.8-1.2-2.1-1.4-2.5-1.4z" /></svg>
+        <span className="text-[13px] font-semibold" style={{ color: "#4a5268" }}>Pay</span>
       </span>
     </div>
   );
 }
 
-function MobileBar({ total, canSubmit, submitting, onContinue }: {
-  total: number; canSubmit: boolean; submitting: boolean; onContinue: () => void;
+function MobileBar({ total, hasService, submitting, onContinue }: {
+  total: number; hasService: boolean; submitting: boolean; onContinue: () => void;
 }) {
   const animTotal = useCountUp(total);
   if (total <= 0) return null;
   return (
     <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-4 py-3 flex items-center gap-3"
-      style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(10px)", borderTop: "1px solid var(--hairline)", boxShadow: "0 -8px 24px -12px rgba(20,17,15,0.18)" }}>
+      style={{ background: "rgba(255,255,255,0.94)", backdropFilter: "blur(10px)", borderTop: "1px solid var(--hairline)", boxShadow: "0 -8px 24px -12px rgba(10,15,31,0.18)" }}>
       <div className="leading-tight">
-        <p className="text-[10px] uppercase tracking-wider text-[color:var(--ink-faint)]">Total</p>
-        <p className="num text-[19px] font-bold" style={{ letterSpacing: "-0.02em" }}>{fmt(animTotal)}</p>
+        <p className="text-[10.5px] uppercase tracking-wider text-[color:var(--ink-faint)]">Total</p>
+        <p className="num text-[20px] font-bold" style={{ letterSpacing: "-0.02em" }}>{fmt(animTotal)}</p>
       </div>
-      <button onClick={onContinue} disabled={!canSubmit}
-        className="cta-gradient ml-auto h-12 px-6 flex items-center justify-center gap-2 text-[12.5px] font-bold tracking-[0.14em] uppercase rounded-xl text-white">
+      <button onClick={onContinue} disabled={!hasService || submitting}
+        className="cta-gradient ml-auto h-12 px-6 flex items-center justify-center gap-2 text-[12.5px] font-bold tracking-[0.14em] uppercase rounded-xl">
         {submitting ? <><Spinner /> Processing</> : "Continue"}
       </button>
     </div>
@@ -310,30 +434,29 @@ function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
 
   if (leadClosed) {
     return (
-      <div className="mt-2">
-        <p className="text-[13.5px] text-[color:var(--ink-soft)]">Lead Retrieval registration has closed for this event.</p>
+      <div className="mt-4">
+        <p className="text-[14px] text-[color:var(--ink-soft)]">Lead Retrieval registration has closed for this event.</p>
         <button onClick={() => setShowPast((s) => !s)}
-          className="text-[12px] font-medium mt-1.5 underline underline-offset-2 decoration-stone-300 hover:decoration-stone-500 transition-colors"
+          className="text-[13px] font-medium mt-1.5 underline underline-offset-2 decoration-stone-300 hover:decoration-stone-500 transition-colors"
           style={{ color: "var(--ink-soft)" }}>
           {showPast ? "Hide past pricing" : "View past pricing ›"}
         </button>
-        {showPast && <Timeline today={today} />}
+        {showPast && <div className="mt-3"><Timeline today={today} /></div>}
       </div>
     );
   }
 
   return (
-    <div className="mt-2">
-      <p className="text-[12.5px] text-[color:var(--ink-soft)] mb-4">
-        Pricing rises as the event approaches. Today you pay{" "}
-        <span className="font-semibold num" style={{ color: "#16130f" }}>{fmt(leadTier!.price)}</span>. Register early to lock in the lower rate.
+    <div className="mt-5">
+      <p className="text-[14px] text-[color:var(--ink-soft)] mb-4 leading-relaxed">
+        Lead retrieval prices increase as the event approaches. Please review the pricing deadlines and order early to secure the lowest available rate.
       </p>
       <Timeline today={today} />
-      <label className="mt-4 flex items-center gap-3 cursor-pointer rounded-xl border px-4 h-14 transition-colors"
-        style={{ borderColor: checked ? "#16130f" : "var(--hairline)", background: checked ? "rgba(22,19,15,0.03)" : "transparent" }}>
+      <label className="mt-5 flex items-center gap-3 cursor-pointer rounded-xl border px-4 h-14 transition-colors"
+        style={{ borderColor: checked ? "var(--blue)" : "var(--hairline)", background: checked ? "rgba(27,58,160,0.05)" : "#ffffff" }}>
         <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} className="h-5 w-5" />
-        <span className="text-[14px] font-medium">Add Lead Retrieval at today&apos;s price</span>
-        <span className="ml-auto num text-[16px] font-bold" style={{ color: "#16130f" }}>{fmt(leadTier!.price)}</span>
+        <span className="text-[15px] font-medium">Add Lead Retrieval at today&apos;s price</span>
+        <span className="ml-auto num text-[17px] font-bold" style={{ color: "var(--foreground)" }}>{fmt(leadTier!.price)}</span>
       </label>
     </div>
   );
@@ -341,9 +464,9 @@ function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl px-4 py-3 text-[12.5px] leading-relaxed"
-      style={{ background: "rgba(20,17,15,0.03)", border: "1px solid var(--hairline)", color: "var(--ink-soft)" }}>
-      <span className="font-semibold" style={{ color: "#16130f" }}>Note. </span>{children}
+    <div className="rounded-xl px-4 py-3 text-[13px] leading-relaxed"
+      style={{ background: "rgba(10,15,31,0.03)", border: "1px solid var(--hairline)", color: "var(--ink-soft)" }}>
+      <span className="font-semibold" style={{ color: "var(--foreground)" }}>Note. </span>{children}
     </div>
   );
 }
@@ -358,18 +481,17 @@ function Timeline({ today }: { today: Date }) {
         return (
           <div key={tier.id} className="flex-1 rounded-xl px-2 py-3 text-center transition-colors"
             style={{
-              background: current ? "rgba(192,24,42,0.06)" : "transparent",
-              border: current ? "1px solid rgba(192,24,42,0.35)" : "1px solid var(--hairline)",
+              background: current ? "rgba(27,58,160,0.07)" : "transparent",
+              border: current ? "1.5px solid var(--blue)" : "1px solid var(--hairline)",
               opacity: past ? 0.4 : 1,
             }}>
-            <div className="text-[9px] font-bold tracking-[0.1em] uppercase mb-1"
-              style={{ color: "var(--emrg-red)" }}>
-              {current ? "Today" : " "}
+            <div className="text-[10px] font-bold tracking-[0.1em] uppercase mb-1" style={{ color: "var(--blue)" }}>
+              {current ? "Today" : " "}
             </div>
-            <div className="num text-[15px]" style={{ fontWeight: current ? 700 : 600, color: current ? "var(--emrg-red)" : past ? "var(--ink-faint)" : "#16130f", textDecoration: past ? "line-through" : "none" }}>
+            <div className="num text-[16px]" style={{ fontWeight: current ? 700 : 600, color: current ? "var(--blue)" : past ? "var(--ink-faint)" : "var(--foreground)", textDecoration: past ? "line-through" : "none" }}>
               {fmt(tier.price).replace(".00", "")}
             </div>
-            <div className="text-[10px] text-[color:var(--ink-faint)] mt-0.5">thru {shortEnd(tier.end)}</div>
+            <div className="text-[10.5px] text-[color:var(--ink-faint)] mt-0.5">thru {shortEnd(tier.end)}</div>
           </div>
         );
       })}
@@ -382,28 +504,28 @@ function Timeline({ today }: { today: Date }) {
 function StepTitle({ n, note, deadline, children }: { n: number; note?: number; deadline?: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="flex items-center justify-center w-7 h-7 rounded-full text-[12px] font-bold text-white shrink-0 num"
-        style={{ background: "linear-gradient(160deg, #2a2521, #0d0b0a)" }}>{n}</span>
-      <h2 className="text-[16px] font-bold" style={{ letterSpacing: "-0.01em" }}>{children}</h2>
-      {deadline && <span className="text-[11px] font-medium text-[color:var(--ink-faint)]">{deadline}</span>}
-      {note !== undefined && note > 0 && <span className="ml-auto num text-[15px] font-bold">{fmt(note)}</span>}
+      <span className="flex items-center justify-center w-7 h-7 rounded-full text-[12.5px] font-bold text-white shrink-0 num"
+        style={{ background: "linear-gradient(160deg, #12307e, #000434)" }}>{n}</span>
+      <h2 className="text-[18px] font-bold" style={{ letterSpacing: "-0.01em" }}>{children}</h2>
+      {deadline && <span className="text-[12.5px] font-medium text-[color:var(--ink-soft)]">{deadline}</span>}
+      {note !== undefined && note > 0 && <span className="ml-auto num text-[16px] font-bold">{fmt(note)}</span>}
     </div>
   );
 }
 
-function Field({ label, value, onChange, onBlur, placeholder, required, invalid, error }: {
+function Field({ label, value, onChange, onBlur, placeholder, required, invalid, error, inputRef }: {
   label: string; value: string; onChange: (v: string) => void; onBlur?: () => void;
-  placeholder?: string; required?: boolean; invalid?: boolean; error?: string;
+  placeholder?: string; required?: boolean; invalid?: boolean; error?: string; inputRef?: React.Ref<HTMLInputElement>;
 }) {
   return (
     <div>
-      <label className="block text-[10.5px] font-bold tracking-[0.14em] uppercase text-[color:var(--ink-soft)] mb-1.5">
-        {label}{required && <span style={{ color: "var(--emrg-red)" }}> *</span>}
+      <label className="block text-[11.5px] font-bold tracking-[0.12em] uppercase text-[color:var(--ink-soft)] mb-1.5">
+        {label}{required && <span style={{ color: "var(--blue)" }}> *</span>}
       </label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder}
-        className={`w-full border rounded-xl px-3.5 py-2.5 text-[15px] bg-white text-stone-900 placeholder-stone-300 transition-shadow ${invalid ? "invalid" : ""}`}
-        style={{ borderColor: invalid ? "var(--emrg-red)" : "var(--hairline)" }} />
-      {error && <p className="text-[11.5px] mt-1" style={{ color: "var(--emrg-red)" }}>{error}</p>}
+      <input ref={inputRef} value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder}
+        className={`w-full border rounded-xl px-3.5 py-2.5 text-[16px] bg-white placeholder-stone-400 transition-shadow ${invalid ? "invalid" : ""}`}
+        style={{ borderColor: invalid ? "var(--brand-navy)" : "var(--hairline)", color: "var(--foreground)" }} />
+      {error && <p className="text-[12.5px] mt-1 font-medium" style={{ color: "var(--brand-navy)" }}>{error}</p>}
     </div>
   );
 }
@@ -416,19 +538,19 @@ function QtyRow({ label, unitLabel, value, lineTotal, onChange, disabled }: {
   return (
     <div className="flex items-center gap-3 py-3.5" style={{ borderTop: "1px solid var(--hairline)", opacity: disabled ? 0.5 : 1 }}>
       <div className="min-w-0">
-        <p className="text-[14.5px] font-semibold" style={{ letterSpacing: "-0.01em" }}>{label}</p>
-        <p className="text-[12px] text-[color:var(--ink-faint)]">{unitLabel}</p>
+        <p className="text-[15.5px] font-semibold" style={{ letterSpacing: "-0.01em" }}>{label}</p>
+        <p className="text-[13px] text-[color:var(--ink-soft)]">{unitLabel}</p>
       </div>
       <div className="ml-auto flex items-center gap-3">
         <div className="flex items-center rounded-xl border bg-stone-50/60 p-0.5" style={{ borderColor: "var(--hairline)" }}>
           <button onClick={() => onChange(value - 1)} disabled={disabled || value <= 0}
-            className="spring w-8 h-8 rounded-lg text-stone-600 text-lg leading-none hover:bg-white disabled:opacity-25" aria-label={`Decrease ${label}`}>−</button>
+            className="spring w-8 h-8 rounded-lg text-[color:var(--ink)] text-lg leading-none hover:bg-white disabled:opacity-25" aria-label={`Decrease ${label}`}>−</button>
           <input value={value} onChange={(e) => onChange(parseInt(e.target.value.replace(/[^0-9]/g, "")) || 0)} disabled={disabled}
-            className="tnum w-10 text-center bg-transparent text-[15px] font-semibold outline-none" inputMode="numeric" aria-label={`${label} quantity`} />
+            className="tnum w-10 text-center bg-transparent text-[16px] font-semibold outline-none" inputMode="numeric" aria-label={`${label} quantity`} />
           <button onClick={() => onChange(value + 1)} disabled={disabled}
-            className="spring w-8 h-8 rounded-lg text-stone-600 text-lg leading-none hover:bg-white disabled:opacity-25" aria-label={`Increase ${label}`}>+</button>
+            className="spring w-8 h-8 rounded-lg text-[color:var(--ink)] text-lg leading-none hover:bg-white disabled:opacity-25" aria-label={`Increase ${label}`}>+</button>
         </div>
-        <span className="num w-24 text-right text-[15px] font-bold" style={{ color: active ? "#16130f" : "#cfc8bf" }}>{fmt(anim)}</span>
+        <span className="num w-24 text-right text-[16px] font-bold" style={{ color: active ? "var(--foreground)" : "#b9c1d3" }}>{fmt(anim)}</span>
       </div>
     </div>
   );
