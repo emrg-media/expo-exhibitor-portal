@@ -45,20 +45,31 @@ export default function BoothServicesPage() {
   const companyRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
 
-  // Scroll-spy: light up the step in the hero as each section crosses the viewport center.
+  // Scroll-spy: the active step is the last section whose top has scrolled past
+  // ~35% of the viewport. Monotonic, so the highlight advances 1->2->3->4 cleanly
+  // instead of flickering between sections of different heights.
   const [activeStep, setActiveStep] = useState(0);
   const sectionRefs = useRef<Array<HTMLElement | null>>([]);
   useEffect(() => {
-    const obs = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) {
-          const idx = sectionRefs.current.indexOf(e.target as HTMLElement);
-          if (idx >= 0) setActiveStep(idx);
-        }
-      }
-    }, { rootMargin: "-45% 0px -45% 0px" });
-    sectionRefs.current.forEach((el) => el && obs.observe(el));
-    return () => obs.disconnect();
+    let raf = 0;
+    const compute = () => {
+      raf = 0;
+      const threshold = window.innerHeight * 0.35;
+      let active = 0;
+      sectionRefs.current.forEach((el, i) => {
+        if (el && el.getBoundingClientRect().top <= threshold) active = i;
+      });
+      setActiveStep(active);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(compute); };
+    compute();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   const [sel, setSel] = useState<OrderSelection>({ amp20Qty: 0, powerStripQty: 0, wifiDevices: 0, leadRetrieval: false });
@@ -192,19 +203,6 @@ export default function BoothServicesPage() {
 
             {/* Left: form */}
             <div className="space-y-5">
-              {/* Countdown chip */}
-              {daysLeft !== null && daysLeft > 0 && (
-                <div className="flex items-center gap-2.5 rounded-full w-fit px-4 py-2 text-[13px] font-semibold"
-                  style={{ background: "rgba(27,58,160,0.07)", border: "1px solid rgba(27,58,160,0.22)", color: "var(--brand-navy)" }}>
-                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <circle cx="8" cy="8.5" r="6" stroke="currentColor" strokeWidth="1.4" />
-                    <path d="M8 5.2v3.4l2.1 1.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  {daysLeft} {daysLeft === 1 ? "day" : "days"} left at this rate
-                  <span className="font-medium text-[color:var(--ink-soft)]">· Lead Retrieval</span>
-                </div>
-              )}
-
               {/* Company */}
               <section ref={(el) => { sectionRefs.current[0] = el; }} className="premium-card p-6 md:p-7">
                 <StepTitle n={1}>Your Company</StepTitle>
@@ -225,10 +223,7 @@ export default function BoothServicesPage() {
               {/* Electric */}
               <section ref={(el) => { sectionRefs.current[1] = el; }} className="premium-card p-6 md:p-7">
                 <StepTitle n={2} note={electricitySubtotal} deadline={`Order by ${WIFI_ELECTRIC_DEADLINE}`}>Electric</StepTitle>
-                <p className="text-[14px] text-[color:var(--ink-soft)] mt-2 leading-relaxed">
-                  If you are planning to use any type of electrical device in your booth, you must submit an electric order in advance. You will not be able to order electric day of event.
-                </p>
-                <div className="mt-3">
+                <div className="mt-4">
                   <QtyRow label="20-amp outlet" unitLabel={`${fmt(amp20Unit)} / outlet`} value={sel.amp20Qty} lineTotal={amp20Amount}
                     onChange={(v) => setSel((p) => ({ ...p, amp20Qty: Math.max(0, v), powerStripQty: v <= 0 ? 0 : p.powerStripQty }))} />
                   <QtyRow label="Power strip"
@@ -236,7 +231,7 @@ export default function BoothServicesPage() {
                     value={sel.powerStripQty} lineTotal={stripAmount} disabled={powerStripLocked} onChange={(v) => setQty("powerStripQty", v)} />
                 </div>
                 <div className="mt-4">
-                  <Note>Each 20-amp outlet covers 1,700W at 110V, so order two for 1,800W or more. For a direct tie into main power, labor fees apply; contact the Metropolitan Pavilion coordinator.</Note>
+                  <Note>If you are planning to use any type of electrical device in your booth, you must submit an electric order in advance. You will not be able to order electric day of event.</Note>
                 </div>
               </section>
 
@@ -257,7 +252,7 @@ export default function BoothServicesPage() {
                   <h2 className="text-[21px] font-bold" style={{ letterSpacing: "-0.015em", color: "var(--brand-navy)" }}>Lead Retrieval</h2>
                 </div>
                 <p className="text-[14px] text-[color:var(--ink-soft)] mt-3 leading-relaxed">Scan attendee badges and follow up after the show.</p>
-                <LeadRetrieval today={today} leadTier={leadTier} leadClosed={leadClosed}
+                <LeadRetrieval today={today} leadTier={leadTier} leadClosed={leadClosed} daysLeft={daysLeft}
                   checked={sel.leadRetrieval} onToggle={(b) => setSel((p) => ({ ...p, leadRetrieval: b }))} />
               </section>
 
@@ -427,8 +422,8 @@ function MobileBar({ total, hasService, submitting, onContinue }: {
 
 // ── Lead retrieval ────────────────────────────────────────────────────────────
 
-function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
-  today: Date; leadTier: LeadTier | null; leadClosed: boolean; checked: boolean; onToggle: (b: boolean) => void;
+function LeadRetrieval({ today, leadTier, leadClosed, daysLeft, checked, onToggle }: {
+  today: Date; leadTier: LeadTier | null; leadClosed: boolean; daysLeft: number | null; checked: boolean; onToggle: (b: boolean) => void;
 }) {
   const [showPast, setShowPast] = useState(false);
 
@@ -451,6 +446,16 @@ function LeadRetrieval({ today, leadTier, leadClosed, checked, onToggle }: {
       <p className="text-[14px] text-[color:var(--ink-soft)] mb-4 leading-relaxed">
         Lead retrieval prices increase as the event approaches. Please review the pricing deadlines and order early to secure the lowest available rate.
       </p>
+      {daysLeft !== null && daysLeft > 0 && (
+        <div className="flex items-center gap-2.5 rounded-full w-fit px-4 py-2 mb-4 text-[13px] font-semibold"
+          style={{ background: "rgba(27,58,160,0.07)", border: "1px solid rgba(27,58,160,0.22)", color: "var(--brand-navy)" }}>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8.5" r="6" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M8 5.2v3.4l2.1 1.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {daysLeft} {daysLeft === 1 ? "day" : "days"} left at this rate
+        </div>
+      )}
       <Timeline today={today} />
       <label className="mt-5 flex items-center gap-3 cursor-pointer rounded-xl border px-4 h-14 transition-colors"
         style={{ borderColor: checked ? "var(--blue)" : "var(--hairline)", background: checked ? "rgba(27,58,160,0.05)" : "#ffffff" }}>

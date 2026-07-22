@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   }
 
   const dateStr = when.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const logoBase64 = readFileSync(join(process.cwd(), "public", "expo-logo.png")).toString("base64");
+  const logoBase64 = readFileSync(join(process.cwd(), "public", "expo-logo-white.png")).toString("base64");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdf = await renderToBuffer(buildReceiptDocument({ company, totals, logoBase64, dateStr }) as any);
 

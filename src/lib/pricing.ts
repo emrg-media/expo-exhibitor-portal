@@ -12,7 +12,7 @@ export const EVENT_INFO = {
 };
 
 // Order deadline for Wi-Fi and Electric (from the exhibitor form). No day-of ordering.
-export const WIFI_ELECTRIC_DEADLINE = "Friday, October 2, 2026";
+export const WIFI_ELECTRIC_DEADLINE = "Friday, October 2nd, 2026";
 
 // ── Electricity ──────────────────────────────────────────────────────────────
 // CONFIRM: 2025 form lists the 20-amp outlet at "$150 per day x days". Treating
