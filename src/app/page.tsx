@@ -8,7 +8,7 @@ import {
 } from "@/lib/pricing";
 import { useCountUp, formatPhone, isValidEmail } from "@/lib/ui";
 
-const STEPS = ["Company", "Electric", "Wi-Fi", "Lead Retrieval"];
+const STEPS = ["Company Information", "Electric", "Wi-Fi", "Expo Add-Ons", "Lead Retrieval"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const INTRO = "Enhance your Expo experience by ordering any additional services you may need, including electric, Wi-Fi, and lead retrieval. Please select your items below and submit your order form in advance to ensure everything is ready when you arrive at the Expo. Please follow all deadline dates.";
 
@@ -25,8 +25,6 @@ function daysLeftInTier(today: Date, endStr: string): number {
   return Math.round((end.getTime() - t0.getTime()) / 86400000) + 1;
 }
 
-const DATE_VENUE = `${EVENT_INFO.dates} / ${EVENT_INFO.location}`;
-
 export default function BoothServicesPage() {
   const [today, setToday] = useState<Date>(() => new Date());
   const [mounted, setMounted] = useState(false);
@@ -39,10 +37,12 @@ export default function BoothServicesPage() {
     }
   }, []);
 
-  const [company, setCompany] = useState({ company: "", contact: "", email: "", phone: "" });
+  const [company, setCompany] = useState({ company: "", firstName: "", lastName: "", email: "", phone: "" });
   const [emailTouched, setEmailTouched] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const companyRef = useRef<HTMLInputElement>(null);
+  const firstRef = useRef<HTMLInputElement>(null);
+  const lastRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
 
   // Scroll-spy: the active step is the last section whose top has scrolled past
@@ -98,15 +98,19 @@ export default function BoothServicesPage() {
   ];
 
   const companyMissing = !company.company.trim();
+  const firstMissing = !company.firstName.trim();
+  const lastMissing = !company.lastName.trim();
   const emailMissing = !company.email.trim();
   const emailBad = company.email.trim().length > 0 && !isValidEmail(company.email);
   const companyError = attempted && companyMissing ? "Company name is required" : undefined;
+  const firstError = attempted && firstMissing ? "First name is required" : undefined;
+  const lastError = attempted && lastMissing ? "Last name is required" : undefined;
   const emailError = (emailTouched || attempted)
     ? (emailMissing ? "Email is required" : emailBad ? "Enter a valid email address" : undefined)
     : undefined;
 
   const hasService = totals.lines.length > 0;
-  const formValid = !companyMissing && isValidEmail(company.email) && hasService;
+  const formValid = !companyMissing && !firstMissing && !lastMissing && isValidEmail(company.email) && hasService;
 
   function setQty(key: keyof OrderSelection, v: number) {
     setSel((p) => ({ ...p, [key]: Math.max(0, v) }));
@@ -120,7 +124,7 @@ export default function BoothServicesPage() {
     if (submitting || !hasService) return;
     if (!formValid) {
       setAttempted(true);
-      const target = companyMissing ? companyRef.current : emailRef.current;
+      const target = companyMissing ? companyRef.current : firstMissing ? firstRef.current : lastMissing ? lastRef.current : emailRef.current;
       target?.scrollIntoView({ behavior: "smooth", block: "center" });
       setTimeout(() => target?.focus({ preventScroll: true }), 350);
       return;
@@ -128,10 +132,16 @@ export default function BoothServicesPage() {
     setSubmitError(false);
     setSubmitting(true);
     try {
+      const payload = {
+        company: company.company,
+        contact: `${company.firstName} ${company.lastName}`.trim(),
+        email: company.email,
+        phone: company.phone,
+      };
       const res = await fetch("/api/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company, selection: sel, today: today.toISOString() }),
+        body: JSON.stringify({ company: payload, selection: sel, today: today.toISOString() }),
       });
       if (!res.ok) throw new Error("Order failed");
       const blob = await res.blob();
@@ -163,29 +173,30 @@ export default function BoothServicesPage() {
       <header className="hero-gradient text-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-6 md:px-8 pt-12 pb-16 relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-16 md:h-20 w-auto mb-5" style={{ filter: "brightness(0) invert(1)" }} />
-          <p className="text-[16px] md:text-[18px] font-semibold text-white/90 mb-6" style={{ letterSpacing: "0.01em" }}>
-            <span className="num">{EVENT_INFO.dates}</span> <span className="text-white/45 mx-1">/</span> {EVENT_INFO.location}
-          </p>
+          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-20 md:h-24 w-auto mb-4" style={{ filter: "brightness(0) invert(1)" }} />
+          {/* Date + city, indented so the O in October sits under the E in EXPO */}
+          <div className="ml-[26px] md:ml-[32px] mb-6">
+            <p className="num text-[17px] md:text-[19px] font-semibold text-white leading-tight">{EVENT_INFO.dates}</p>
+            <p className="text-[15px] md:text-[16px] text-white/85 mt-0.5">{EVENT_INFO.location}</p>
+          </div>
           <h1 className="text-[36px] md:text-[46px] font-bold leading-[1.02]" style={{ letterSpacing: "-0.03em" }}>Booth Services</h1>
 
           {phase === "form" && (
             <>
-              <p className="text-[15px] md:text-[15.5px] text-white/75 mt-4 max-w-2xl leading-relaxed">{INTRO}</p>
+              <p className="text-[15px] md:text-[15.5px] text-white/90 mt-4 max-w-2xl leading-relaxed">{INTRO}</p>
               {/* Step indicator (clickable for back/forward navigation) */}
-              <div className="flex flex-wrap items-center gap-2.5 mt-7">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 mt-7">
                 {STEPS.map((s, i) => {
                   const current = i === activeStep;
-                  const done = i < activeStep;
                   return (
                     <div key={s} className="flex items-center gap-2.5">
                       <button type="button" onClick={() => scrollToStep(i)}
                         className="step-chip flex items-center gap-1.5 text-[12.5px] tracking-wide"
-                        style={{ color: current ? "#fff" : done ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.5)", fontWeight: current ? 600 : 500 }}>
+                        style={{ color: current ? "#fff" : "rgba(255,255,255,0.85)", fontWeight: current ? 700 : 500 }}>
                         {current && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#fff" }} />}
                         <span className="tnum">{i + 1}</span> {s}
                       </button>
-                      {i < STEPS.length - 1 && <span className="w-6 h-px" style={{ background: "rgba(255,255,255,0.16)" }} />}
+                      {i < STEPS.length - 1 && <span className="w-6 h-px" style={{ background: "rgba(255,255,255,0.3)" }} />}
                     </div>
                   );
                 })}
@@ -205,18 +216,25 @@ export default function BoothServicesPage() {
             <div className="space-y-5">
               {/* Company */}
               <section ref={(el) => { sectionRefs.current[0] = el; }} className="premium-card p-6 md:p-7">
-                <StepTitle n={1}>Your Company</StepTitle>
+                <StepTitle n={1}>Company Information</StepTitle>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
-                  <Field label="Company name" required value={company.company} inputRef={companyRef}
-                    onChange={(v) => setCompany({ ...company, company: v })}
-                    invalid={!!companyError} error={companyError} placeholder="Acme Events" />
-                  <Field label="Contact name" value={company.contact} onChange={(v) => setCompany({ ...company, contact: v })} placeholder="Jane Smith" />
-                  <Field label="Cell phone" value={company.phone} onChange={(v) => setCompany({ ...company, phone: formatPhone(v) })} placeholder="(212) 555-0100" />
-                  <Field label="Email" required value={company.email} inputRef={emailRef}
+                  <div className="sm:col-span-2">
+                    <Field label="Company Name" required value={company.company} inputRef={companyRef}
+                      onChange={(v) => setCompany({ ...company, company: v })}
+                      invalid={!!companyError} error={companyError} placeholder="Acme Events" />
+                  </div>
+                  <Field label="First Name" required value={company.firstName} inputRef={firstRef}
+                    onChange={(v) => setCompany({ ...company, firstName: v })}
+                    invalid={!!firstError} error={firstError} placeholder="Jane" />
+                  <Field label="Last Name" required value={company.lastName} inputRef={lastRef}
+                    onChange={(v) => setCompany({ ...company, lastName: v })}
+                    invalid={!!lastError} error={lastError} placeholder="Smith" />
+                  <Field label="Email Address" required value={company.email} inputRef={emailRef}
                     onChange={(v) => setCompany({ ...company, email: v })}
                     onBlur={() => setEmailTouched(true)}
                     invalid={!!emailError} error={emailError}
                     placeholder="jane@acme.com" />
+                  <Field label="Phone Number" value={company.phone} onChange={(v) => setCompany({ ...company, phone: formatPhone(v) })} placeholder="(212) 555-0100" />
                 </div>
               </section>
 
@@ -231,7 +249,10 @@ export default function BoothServicesPage() {
                     value={sel.powerStripQty} lineTotal={stripAmount} disabled={powerStripLocked} onChange={(v) => setQty("powerStripQty", v)} />
                 </div>
                 <div className="mt-4">
-                  <Note>If you are planning to use any type of electrical device in your booth, you must submit an electric order in advance. You will not be able to order electric day of event.</Note>
+                  <Note label="Important:">
+                    Each 20-amp outlet covers 1 to 1,700 Watts / 110 Volts. If you have 1,800 or more Watts, you need to order two 20-amp outlets. For direct tie-in to main power, tie-in/tie-out and electrician labor fees, contact the Metropolitan Pavilion.
+                    <span className="block mt-2">If you are planning to use any type of electrical device in your booth, you must submit an electric order in advance. You will not be able to order electric day of event.</span>
+                  </Note>
                 </div>
               </section>
 
@@ -244,11 +265,20 @@ export default function BoothServicesPage() {
                 </div>
               </section>
 
+              {/* Expo Add-Ons (placeholder until Jessica sends the item list) */}
+              <section ref={(el) => { sectionRefs.current[3] = el; }} className="premium-card p-6 md:p-7">
+                <StepTitle n={4}>Expo Add-Ons</StepTitle>
+                <p className="text-[14px] text-[color:var(--ink-soft)] mt-3 leading-relaxed">
+                  Additional booth add-ons will be available here soon. For special requests, contact{" "}
+                  <a href="mailto:forms@theeventplannerexpo.com" className="font-semibold underline underline-offset-2" style={{ color: "var(--blue)" }}>forms@theeventplannerexpo.com</a>.
+                </p>
+              </section>
+
               {/* Lead Retrieval (set apart in its own framed card) */}
-              <section ref={(el) => { sectionRefs.current[3] = el; }} className="lead-card p-7 md:p-8">
+              <section ref={(el) => { sectionRefs.current[4] = el; }} className="lead-card p-7 md:p-8">
                 <div className="flex items-center gap-3">
                   <span className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-bold text-white shrink-0 num"
-                    style={{ background: "linear-gradient(160deg, #12307e, #000434)" }}>4</span>
+                    style={{ background: "linear-gradient(160deg, #12307e, #000434)" }}>5</span>
                   <h2 className="text-[21px] font-bold" style={{ letterSpacing: "-0.015em", color: "var(--brand-navy)" }}>Lead Retrieval</h2>
                 </div>
                 <p className="text-[14px] text-[color:var(--ink-soft)] mt-3 leading-relaxed">Scan attendee badges and follow up after the show.</p>
@@ -345,7 +375,7 @@ function SummaryCard({ lines, totals, hasService, submitting, submitError, onCon
         {lines.map((l) => {
           const on = l.amount > 0;
           return (
-            <div key={l.key} className="flex items-baseline justify-between gap-3 text-[14.5px] transition-opacity duration-200" style={{ opacity: on ? 1 : 0.4 }}>
+            <div key={l.key} className="flex items-baseline justify-between gap-3 text-[14.5px] transition-opacity duration-200" style={{ opacity: on ? 1 : 0.55 }}>
               <span style={{ color: "var(--ink)" }}>
                 {l.label}{on && <span className="text-[color:var(--ink-faint)] text-[12.5px]"> {l.qty} &times; {fmt(l.unit)}</span>}
               </span>
@@ -467,11 +497,11 @@ function LeadRetrieval({ today, leadTier, leadClosed, daysLeft, checked, onToggl
   );
 }
 
-function Note({ children }: { children: React.ReactNode }) {
+function Note({ label = "Note.", children }: { label?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl px-4 py-3 text-[13px] leading-relaxed"
       style={{ background: "rgba(10,15,31,0.03)", border: "1px solid var(--hairline)", color: "var(--ink-soft)" }}>
-      <span className="font-semibold" style={{ color: "var(--foreground)" }}>Note. </span>{children}
+      <span className="font-semibold" style={{ color: "var(--foreground)" }}>{label} </span>{children}
     </div>
   );
 }
@@ -524,12 +554,12 @@ function Field({ label, value, onChange, onBlur, placeholder, required, invalid,
 }) {
   return (
     <div>
-      <label className="block text-[11.5px] font-bold tracking-[0.12em] uppercase text-[color:var(--ink-soft)] mb-1.5">
+      <label className="block text-[12px] font-bold tracking-[0.1em] uppercase text-[color:var(--foreground)] mb-1.5">
         {label}{required && <span style={{ color: "var(--blue)" }}> *</span>}
       </label>
       <input ref={inputRef} value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder}
-        className={`w-full border rounded-xl px-3.5 py-2.5 text-[16px] bg-white placeholder-stone-400 transition-shadow ${invalid ? "invalid" : ""}`}
-        style={{ borderColor: invalid ? "var(--brand-navy)" : "var(--hairline)", color: "var(--foreground)" }} />
+        className={`w-full border-[1.5px] rounded-xl px-3.5 py-2.5 text-[16px] bg-white transition-shadow ${invalid ? "invalid" : ""}`}
+        style={{ borderColor: invalid ? "var(--brand-navy)" : "var(--field-border)", color: "var(--foreground)" }} />
       {error && <p className="text-[12.5px] mt-1 font-medium" style={{ color: "var(--brand-navy)" }}>{error}</p>}
     </div>
   );

@@ -6,9 +6,9 @@ export const PROCESSING_FEE_RATE = 0.03; // 3% credit card processing fee, appli
 
 // 2026 event details (from Jessica).
 export const EVENT_INFO = {
-  dates: "October 27th-29th, 2026",
-  location: "NYC",                       // short label shown in the header + summary
-  venue: "Metropolitan Pavilion, New York", // full venue, used in guidance notes
+  dates: "October 27-29, 2026",
+  location: "New York City",              // shown in the header + summary
+  venue: "Metropolitan Pavilion",         // full venue, used in guidance notes
 };
 
 // Order deadline for Wi-Fi and Electric (from the exhibitor form). No day-of ordering.
@@ -28,9 +28,9 @@ export const EVENT_DAYS = 3; // used only if amp20PerDay is true
 // ── Wi-Fi ────────────────────────────────────────────────────────────────────
 export const WIFI_PER_DEVICE = 20;
 
-// ── Lead Retrieval (Crowd Pass), date-tiered ─────────────────────────────────
-// CONFIRM: these are the 2025 dates. `end` is the last day (inclusive) the price
-// is available. Update the whole block when Jessica sends the 2026 calendar.
+// ── Lead Retrieval, date-tiered ──────────────────────────────────────────────
+// 2026 pricing and deadlines from Jessica. `end` is the last day (inclusive) the
+// price is available; price rises as the event approaches.
 export interface LeadTier {
   id: string;
   label: string;   // human label shown in the table
@@ -38,12 +38,12 @@ export interface LeadTier {
   end: string;     // inclusive last day, YYYY-MM-DD
 }
 export const LEAD_TIERS: LeadTier[] = [
-  { id: "t1", label: "Through September 18", price: 150, end: "2026-09-18" },
-  { id: "t2", label: "September 19 to 29", price: 250, end: "2026-09-29" },
-  { id: "t3", label: "September 30 to October 9", price: 300, end: "2026-10-09" },
-  { id: "t4", label: "October 10 to 16", price: 350, end: "2026-10-16" },
-  { id: "t5", label: "October 17 to 24", price: 400, end: "2026-10-24" },
-  { id: "t6", label: "October 25 to 29", price: 550, end: "2026-10-29" },
+  { id: "t1", label: "By August 20", price: 150, end: "2026-08-20" },
+  { id: "t2", label: "By September 10", price: 250, end: "2026-09-10" },
+  { id: "t3", label: "By September 24", price: 300, end: "2026-09-24" },
+  { id: "t4", label: "By October 9", price: 350, end: "2026-10-09" },
+  { id: "t5", label: "By October 24", price: 400, end: "2026-10-24" },
+  { id: "t6", label: "October 27-29", price: 550, end: "2026-10-29" },
 ];
 
 // ── Selection + computation ──────────────────────────────────────────────────

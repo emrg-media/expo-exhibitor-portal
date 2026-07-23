@@ -7,10 +7,11 @@
   --blue: #1b3aa0;                /* primary interactive */
   --blue-bright: #2b56d8;         /* CTA gradient top / hover / active accent */
   --blue-dark: #0f2670;           /* CTA gradient bottom / pressed */
-  --ink: #1b2333;                 /* strong body text */
-  --ink-soft: #414b61;            /* secondary text (darkened for legibility) */
-  --ink-faint: #667089;           /* labels / hints (darkened for legibility) */
-  --hairline: rgba(10, 15, 31, 0.13);
+  --ink: #141a2a;                 /* strong body text (near-black) */
+  --ink-soft: #2c3546;            /* secondary text: dark, high-contrast */
+  --ink-faint: #4c576f;           /* tertiary text: still clearly readable */
+  --field-border: #1b2333;        /* strong outline on input boxes */
+  --hairline: rgba(10, 15, 31, 0.14);
   --radius-card: 16px;
   --radius-control: 12px;
   /* Layered elevation, navy-tinted */
@@ -130,6 +131,9 @@ input.invalid { border-color: var(--brand-navy) !important; box-shadow: 0 0 0 3p
 input.invalid:focus { border-color: var(--brand-navy) !important; box-shadow: 0 0 0 3px rgba(0, 4, 52, 0.16); }
 
 input[type="checkbox"] { accent-color: var(--blue); cursor: pointer; }
+
+/* Darker, clearly legible placeholder text (was too light) */
+input::placeholder { color: #737d93; opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .cta-gradient, .spring, .step-chip { transition: none; }
