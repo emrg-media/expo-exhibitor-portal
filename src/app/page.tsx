@@ -8,13 +8,17 @@ import {
 } from "@/lib/pricing";
 import { useCountUp, formatPhone, isValidEmail } from "@/lib/ui";
 
-const STEPS = ["Company Information", "Electric", "Wi-Fi", "Expo Add-Ons", "Lead Retrieval"];
+const STEPS = ["Company Information", "Electric", "Wi-Fi", "Lead Retrieval"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const INTRO = "Enhance your Expo experience by ordering any additional services you may need, including electric, Wi-Fi, and lead retrieval. Please select your items below and submit your order form in advance to ensure everything is ready when you arrive at the Expo. Please follow all deadline dates.";
 
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
 function shortEnd(end: string): string {
   const [, m, d] = end.split("-").map(Number);
-  return `${MONTHS[m - 1]} ${d}`;
+  return `${MONTHS[m - 1]} ${ordinal(d)}`;
 }
 
 // Days remaining (inclusive of today and the tier's last day) at the current rate.
@@ -173,12 +177,13 @@ export default function BoothServicesPage() {
       <header className="hero-gradient text-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-6 md:px-8 pt-12 pb-16 relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-20 md:h-24 w-auto mb-4" style={{ filter: "brightness(0) invert(1)" }} />
-          {/* Date + city, indented so the O in October sits under the E in EXPO */}
-          <div className="ml-[26px] md:ml-[32px] mb-6">
-            <p className="num text-[17px] md:text-[19px] font-semibold text-white leading-tight">{EVENT_INFO.dates}</p>
-            <p className="text-[15px] md:text-[16px] text-white/85 mt-0.5">{EVENT_INFO.location}</p>
-          </div>
+          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-24 md:h-28 w-auto mb-2" style={{ filter: "brightness(0) invert(1)" }} />
+          {/* Date + city on one line, matching the Expo site, indented so the O in October sits under the E in EXPO */}
+          <p className="ml-[32px] md:ml-[37px] mb-6 text-[16px] md:text-[18px] font-semibold text-white leading-tight">
+            <span className="num">{EVENT_INFO.dates}</span>
+            <span className="mx-2 text-white/45">|</span>
+            {EVENT_INFO.location}
+          </p>
           <h1 className="text-[36px] md:text-[46px] font-bold leading-[1.02]" style={{ letterSpacing: "-0.03em" }}>Booth Services</h1>
 
           {phase === "form" && (
@@ -265,20 +270,11 @@ export default function BoothServicesPage() {
                 </div>
               </section>
 
-              {/* Expo Add-Ons (placeholder until Jessica sends the item list) */}
-              <section ref={(el) => { sectionRefs.current[3] = el; }} className="premium-card p-6 md:p-7">
-                <StepTitle n={4}>Expo Add-Ons</StepTitle>
-                <p className="text-[14px] text-[color:var(--ink-soft)] mt-3 leading-relaxed">
-                  Additional booth add-ons will be available here soon. For special requests, contact{" "}
-                  <a href="mailto:forms@theeventplannerexpo.com" className="font-semibold underline underline-offset-2" style={{ color: "var(--blue)" }}>forms@theeventplannerexpo.com</a>.
-                </p>
-              </section>
-
               {/* Lead Retrieval (set apart in its own framed card) */}
-              <section ref={(el) => { sectionRefs.current[4] = el; }} className="lead-card p-7 md:p-8">
+              <section ref={(el) => { sectionRefs.current[3] = el; }} className="lead-card p-7 md:p-8">
                 <div className="flex items-center gap-3">
                   <span className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-bold text-white shrink-0 num"
-                    style={{ background: "linear-gradient(160deg, #12307e, #000434)" }}>5</span>
+                    style={{ background: "linear-gradient(160deg, #12307e, #000434)" }}>4</span>
                   <h2 className="text-[21px] font-bold" style={{ letterSpacing: "-0.015em", color: "var(--brand-navy)" }}>Lead Retrieval</h2>
                 </div>
                 <p className="text-[14px] text-[color:var(--ink-soft)] mt-3 leading-relaxed">Scan attendee badges and follow up after the show.</p>
@@ -298,7 +294,7 @@ export default function BoothServicesPage() {
             </aside>
           </div>
 
-          <p className="text-center text-[12px] text-[color:var(--ink-faint)] pt-6 pb-4">EMRG Media &nbsp;·&nbsp; The Event Planner Expo &nbsp;·&nbsp; forms@theeventplannerexpo.com</p>
+          <p className="text-center text-[12px] text-[color:var(--ink-faint)] pt-6 pb-4">For more information, email info@theeventplannerexpo.com</p>
         </div>
       )}
 
@@ -349,7 +345,7 @@ function Confirmation({ receipt, onReset }: { receipt: { url: string; company: {
           Place another order
         </button>
       </div>
-      <p className="text-center text-[12px] text-[color:var(--ink-faint)] pt-6 pb-4">EMRG Media &nbsp;·&nbsp; The Event Planner Expo &nbsp;·&nbsp; forms@theeventplannerexpo.com</p>
+      <p className="text-center text-[12px] text-[color:var(--ink-faint)] pt-6 pb-4">For more information, email info@theeventplannerexpo.com</p>
     </div>
   );
 }
@@ -368,7 +364,7 @@ function SummaryCard({ lines, totals, hasService, submitting, submitError, onCon
 
       {/* Event context, so the summary reads like a receipt from the first glance */}
       <div className="mt-3 pb-3.5 text-[14px] font-semibold" style={{ borderBottom: "1px solid var(--hairline)", color: "var(--ink)" }}>
-        <span className="num">{EVENT_INFO.dates}</span> <span className="text-[color:var(--ink-faint)] mx-0.5">/</span> {EVENT_INFO.location}
+        <span className="num">{EVENT_INFO.dates}</span> <span className="text-[color:var(--ink-faint)] mx-1">|</span> {EVENT_INFO.location}
       </div>
 
       <div className="mt-3.5 space-y-2.5">
@@ -526,7 +522,7 @@ function Timeline({ today }: { today: Date }) {
             <div className="num text-[16px]" style={{ fontWeight: current ? 700 : 600, color: current ? "var(--blue)" : past ? "var(--ink-faint)" : "var(--foreground)", textDecoration: past ? "line-through" : "none" }}>
               {fmt(tier.price).replace(".00", "")}
             </div>
-            <div className="text-[10.5px] text-[color:var(--ink-faint)] mt-0.5">thru {shortEnd(tier.end)}</div>
+            <div className="text-[11px] font-bold mt-1" style={{ color: current ? "var(--blue)" : "var(--foreground)" }}>thru {shortEnd(tier.end)}</div>
           </div>
         );
       })}

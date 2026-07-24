@@ -131,7 +131,7 @@ export function ReceiptPDF({ company, totals, logoBase64, dateStr }: {
 
         <View style={s.footer}>
           <Text style={s.footerText}>EMRG Media LLC  ·  Charges appear as EMRG Media LLC</Text>
-          <Text style={s.footerText}>forms@theeventplannerexpo.com  ·  212.254.3700</Text>
+          <Text style={s.footerText}>info@theeventplannerexpo.com  ·  212.254.3700</Text>
         </View>
       </Page>
     </Document>

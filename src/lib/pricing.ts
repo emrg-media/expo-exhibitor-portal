@@ -6,7 +6,7 @@ export const PROCESSING_FEE_RATE = 0.03; // 3% credit card processing fee, appli
 
 // 2026 event details (from Jessica).
 export const EVENT_INFO = {
-  dates: "October 27-29, 2026",
+  dates: "October 27th-29th",             // year lives on the logo, so it is omitted here
   location: "New York City",              // shown in the header + summary
   venue: "Metropolitan Pavilion",         // full venue, used in guidance notes
 };
