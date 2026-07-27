@@ -176,14 +176,18 @@ export default function BoothServicesPage() {
       {/* Hero */}
       <header className="hero-gradient text-white overflow-hidden">
         <div className="max-w-5xl mx-auto px-6 md:px-8 pt-12 pb-16 relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/expo-logo.png" alt="The Event Planner Expo 2026" className="h-24 md:h-28 w-auto mb-2" style={{ filter: "brightness(0) invert(1)" }} />
-          {/* Date + city on one line, matching the Expo site, indented so the O in October sits under the E in EXPO */}
-          <p className="ml-[32px] md:ml-[37px] mb-6 text-[16px] md:text-[18px] font-semibold text-white leading-tight">
-            <span className="num">{EVENT_INFO.dates}</span>
-            <span className="mx-2 text-white/45">|</span>
-            {EVENT_INFO.location}
-          </p>
+          {/* Logo + date as one tight lockup, matching the Expo site header. The
+              logo asset is pre-cropped to its artwork, so its left edge is the E in
+              EXPO and the date can sit directly beneath with no baked-in padding. */}
+          <div className="mb-7 w-fit">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/expo-logo-tight.png" alt="The Event Planner Expo 2026" className="h-14 md:h-16 w-auto" style={{ filter: "brightness(0) invert(1)" }} />
+            <p className="mt-1.5 text-[16px] md:text-[18px] font-semibold text-white leading-tight whitespace-nowrap">
+              <span className="num">{EVENT_INFO.dates}</span>
+              <span className="mx-2 text-white/45">|</span>
+              {EVENT_INFO.location}
+            </p>
+          </div>
           <h1 className="text-[36px] md:text-[46px] font-bold leading-[1.02]" style={{ letterSpacing: "-0.03em" }}>Booth Services</h1>
 
           {phase === "form" && (
