@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeOrder, type OrderSelection } from "@/lib/pricing";
-import type { ReceiptCompany } from "@/lib/ReceiptPDF";
-import { isValidOrderEmail, renderReceiptPdf, sendOrderEmails } from "@/lib/order";
+import { isValidOrderEmail, renderReceiptPdf, sendOrderEmails, type OrderCompany } from "@/lib/order";
+import { logOrder } from "@/lib/logOrder";
 
 // Direct submit with no payment step. Still used as the fallback while Stripe
 // is not configured, so the form keeps working end to end without keys.
 export async function POST(req: NextRequest) {
   const { company, selection, today } = (await req.json()) as {
-    company: ReceiptCompany; selection: OrderSelection; today?: string;
+    company: OrderCompany; selection: OrderSelection; today?: string;
   };
 
   const when = today ? new Date(today) : new Date();
@@ -22,6 +22,13 @@ export async function POST(req: NextRequest) {
 
   const pdf = await renderReceiptPdf(company, totals, when);
   await sendOrderEmails(company, totals, pdf);
+  await logOrder({
+    company,
+    totals,
+    orderId: `EXPO-${Date.now().toString(36).toUpperCase()}`,
+    paymentStatus: "Submitted (no payment)",
+    when,
+  });
 
   return new NextResponse(new Uint8Array(pdf), {
     headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="expo-booth-services-receipt.pdf"' },

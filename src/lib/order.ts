@@ -137,8 +137,12 @@ export async function sendOrderEmails(
 // in session metadata and is rebuilt on the way back. Values must be strings
 // and stay well under Stripe's 500-character-per-value limit.
 
+// The receipt only needs a joined contact name, but the tracker wants the
+// first and last name the exhibitor actually typed, so both travel together.
+export type OrderCompany = ReceiptCompany & { firstName?: string; lastName?: string };
+
 export interface OrderContext {
-  company: ReceiptCompany;
+  company: OrderCompany;
   selection: OrderSelection;
   when: Date;
 }
@@ -149,6 +153,8 @@ export function encodeOrderMetadata(ctx: OrderContext): Record<string, string> {
     v: "1",
     company: (company.company || "").slice(0, 480),
     contact: (company.contact || "").slice(0, 480),
+    first: (company.firstName || "").slice(0, 240),
+    last: (company.lastName || "").slice(0, 240),
     email: (company.email || "").slice(0, 480),
     phone: (company.phone || "").slice(0, 60),
     // a=20-amp outlets, s=power strips, w=wifi devices, l=lead retrieval
@@ -169,6 +175,8 @@ export function decodeOrderMetadata(md: Record<string, string> | null | undefine
     company: {
       company: md.company || "",
       contact: md.contact || "",
+      firstName: md.first || "",
+      lastName: md.last || "",
       email: md.email || "",
       phone: md.phone || "",
     },

@@ -178,6 +178,8 @@ export default function BoothServicesPage() {
       const payload = {
         company: company.company,
         contact: `${company.firstName} ${company.lastName}`.trim(),
+        firstName: company.firstName,
+        lastName: company.lastName,
         email: company.email,
         phone: company.phone,
       };

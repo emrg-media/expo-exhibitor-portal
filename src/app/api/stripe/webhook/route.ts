@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { decodeOrderMetadata, renderReceiptPdf, sendOrderEmails, totalsFor } from "@/lib/order";
+import { logOrder } from "@/lib/logOrder";
 
 // Stripe calls this once payment actually succeeds, which is the only point at
 // which we send a receipt. Signature is verified against STRIPE_WEBHOOK_SECRET,
@@ -65,6 +66,13 @@ export async function POST(req: NextRequest) {
   const totals = totalsFor(ctx);
   const pdf = await renderReceiptPdf(ctx.company, totals, ctx.when);
   await sendOrderEmails(ctx.company, totals, pdf);
+  await logOrder({
+    company: ctx.company,
+    totals,
+    orderId: session.id,
+    paymentStatus: "Paid",
+    when: ctx.when,
+  });
 
   if (paymentIntentId) {
     try {

@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { computeOrder, fmt, PROCESSING_FEE_RATE, type OrderSelection } from "@/lib/pricing";
-import type { ReceiptCompany } from "@/lib/ReceiptPDF";
-import { encodeOrderMetadata, isValidOrderEmail } from "@/lib/order";
+import { encodeOrderMetadata, isValidOrderEmail, type OrderCompany } from "@/lib/order";
 
 // Creates a Stripe-hosted Checkout Session and hands back its URL for the
 // browser to redirect to. Responds { configured: false } when no Stripe key is
 // present so the form can fall back to the no-payment path instead of breaking.
 export async function POST(req: NextRequest) {
   const { company, selection } = (await req.json()) as {
-    company: ReceiptCompany; selection: OrderSelection;
+    company: OrderCompany; selection: OrderSelection;
   };
 
   const key = process.env.STRIPE_SECRET_KEY;
