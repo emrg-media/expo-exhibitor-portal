@@ -30,6 +30,7 @@ const s = StyleSheet.create({
   eyebrow: { color: "rgba(255,255,255,0.55)", fontSize: 8, letterSpacing: 1.6, marginTop: 14, fontFamily: "Helvetica-Bold" },
   title: { fontFamily: "Helvetica-Bold", fontSize: 22, color: C.white, textAlign: "right", letterSpacing: 1 },
   titleSub: { fontSize: 9, color: "rgba(255,255,255,0.6)", textAlign: "right", marginTop: 4 },
+  titleOrder: { fontSize: 8.5, color: "rgba(255,255,255,0.85)", textAlign: "right", marginTop: 5, letterSpacing: 0.8, fontFamily: "Helvetica-Bold" },
 
   body: { paddingHorizontal: PAD, paddingTop: 26 },
 
@@ -64,8 +65,8 @@ const s = StyleSheet.create({
   footerText: { fontSize: 8, color: C.light },
 });
 
-export function ReceiptPDF({ company, totals, logoBase64, dateStr }: {
-  company: ReceiptCompany; totals: OrderTotals; logoBase64: string; dateStr: string;
+export function ReceiptPDF({ company, totals, logoBase64, dateStr, orderId }: {
+  company: ReceiptCompany; totals: OrderTotals; logoBase64: string; dateStr: string; orderId?: string;
 }) {
   return (
     <Document>
@@ -80,6 +81,7 @@ export function ReceiptPDF({ company, totals, logoBase64, dateStr }: {
             <View>
               <Text style={s.title}>RECEIPT</Text>
               <Text style={s.titleSub}>{dateStr}</Text>
+              {orderId ? <Text style={s.titleOrder}>ORDER {orderId}</Text> : null}
             </View>
           </View>
         </View>
@@ -138,6 +140,6 @@ export function ReceiptPDF({ company, totals, logoBase64, dateStr }: {
   );
 }
 
-export function buildReceiptDocument(props: { company: ReceiptCompany; totals: OrderTotals; logoBase64: string; dateStr: string }) {
+export function buildReceiptDocument(props: { company: ReceiptCompany; totals: OrderTotals; logoBase64: string; dateStr: string; orderId?: string }) {
   return createElement(ReceiptPDF, props);
 }

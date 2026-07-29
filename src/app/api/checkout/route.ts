@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { computeOrder, fmt, PROCESSING_FEE_RATE, type OrderSelection } from "@/lib/pricing";
-import { encodeOrderMetadata, isValidOrderEmail, type OrderCompany } from "@/lib/order";
+import { encodeOrderMetadata, isValidOrderEmail, newOrderId, type OrderCompany } from "@/lib/order";
 
 // Creates a Stripe-hosted Checkout Session and hands back its URL for the
 // browser to redirect to. Responds { configured: false } when no Stripe key is
@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin;
   const stripe = new Stripe(key);
+  // Minted once here and carried in metadata, so the receipt, the confirmation
+  // screen and the tracker all show the same reference.
+  const orderId = newOrderId(when);
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -62,9 +65,9 @@ export async function POST(req: NextRequest) {
       // {CHECKOUT_SESSION_ID} is substituted by Stripe, leave it unencoded.
       success_url: `${origin}/?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?canceled=1`,
-      metadata: encodeOrderMetadata({ company, selection, when }),
+      metadata: encodeOrderMetadata({ company, selection, when, orderId }),
       payment_intent_data: {
-        description: `Expo 2026 booth services for ${company.company || "exhibitor"} (${fmt(totals.total)})`,
+        description: `${orderId} Expo 2026 booth services for ${company.company || "exhibitor"} (${fmt(totals.total)})`,
       },
     });
 

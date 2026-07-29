@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeOrder, type OrderSelection } from "@/lib/pricing";
-import { isValidOrderEmail, renderReceiptPdf, sendOrderEmails, type OrderCompany } from "@/lib/order";
+import { isValidOrderEmail, newOrderId, renderReceiptPdf, sendOrderEmails, type OrderCompany } from "@/lib/order";
 import { logOrder } from "@/lib/logOrder";
 
 // Direct submit with no payment step. Still used as the fallback while Stripe
@@ -20,17 +20,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "A valid email is required." }, { status: 400 });
   }
 
-  const pdf = await renderReceiptPdf(company, totals, when);
-  await sendOrderEmails(company, totals, pdf);
+  const orderId = newOrderId(when);
+  const pdf = await renderReceiptPdf(company, totals, when, orderId);
+  await sendOrderEmails(company, totals, pdf, orderId);
   await logOrder({
     company,
     totals,
-    orderId: `EXPO-${Date.now().toString(36).toUpperCase()}`,
+    orderId,
     paymentStatus: "Submitted (no payment)",
     when,
   });
 
   return new NextResponse(new Uint8Array(pdf), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="expo-booth-services-receipt.pdf"' },
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": 'attachment; filename="expo-booth-services-receipt.pdf"',
+      // So the confirmation screen can show the same reference as the receipt.
+      "X-Order-Id": orderId,
+      "Access-Control-Expose-Headers": "X-Order-Id",
+    },
   });
 }

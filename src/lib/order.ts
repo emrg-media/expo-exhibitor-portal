@@ -7,6 +7,7 @@
 
 import { renderToBuffer } from "@react-pdf/renderer";
 import { readFileSync } from "fs";
+import { randomBytes } from "crypto";
 import { join } from "path";
 import nodemailer from "nodemailer";
 import { computeOrder, fmt, type OrderSelection, type OrderTotals } from "@/lib/pricing";
@@ -37,18 +38,18 @@ export function receiptFilename(company: ReceiptCompany): string {
 }
 
 export async function renderReceiptPdf(
-  company: ReceiptCompany, totals: OrderTotals, when: Date,
+  company: ReceiptCompany, totals: OrderTotals, when: Date, orderId: string,
 ): Promise<Buffer> {
   const dateStr = when.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const logoBase64 = readFileSync(join(process.cwd(), "public", "expo-logo-white.png")).toString("base64");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return renderToBuffer(buildReceiptDocument({ company, totals, logoBase64, dateStr }) as any);
+  return renderToBuffer(buildReceiptDocument({ company, totals, logoBase64, dateStr, orderId }) as any);
 }
 
 // Sends the buyer confirmation and the internal notification. Never throws:
 // a mail failure must not lose an order that has already been paid for.
 export async function sendOrderEmails(
-  company: ReceiptCompany, totals: OrderTotals, pdf: Buffer,
+  company: ReceiptCompany, totals: OrderTotals, pdf: Buffer, orderId?: string,
 ): Promise<void> {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return;
@@ -77,6 +78,7 @@ export async function sendOrderEmails(
       text: [
         `Hi ${firstName(company.contact)},`, "",
         `Thank you for submitting your booth add-on order for The Event Planner Expo 2026.`, "",
+        ...(orderId ? [`Order reference: ${orderId}`, ""] : []),
         `Your order confirmation is as follows:`, "",
         `Electric: ${electric}`,
         `Wi-Fi: ${wifi}`,
@@ -96,6 +98,7 @@ export async function sendOrderEmails(
   <div style="border:1px solid #d9deea;border-top:0;border-radius:0 0 12px 12px;padding:22px">
     <p style="margin:0 0 14px">Hi ${firstName(company.contact)},</p>
     <p style="margin:0 0 14px">Thank you for submitting your booth add-on order for The Event Planner Expo 2026.</p>
+    ${orderId ? `<p style="margin:0 0 14px;font-size:13px;color:#414b61">Order reference: <strong style="color:#000434">${orderId}</strong></p>` : ""}
     <p style="margin:0 0 8px">Your order confirmation is as follows:</p>
     <table style="width:100%;border-collapse:collapse;margin:6px 0 16px">
       <tr><td style="padding:8px 0;border-bottom:1px solid #eef1f7;font-weight:bold;width:120px">Electric</td><td style="padding:8px 0;border-bottom:1px solid #eef1f7">${electric}</td></tr>
@@ -114,9 +117,10 @@ export async function sendOrderEmails(
     // Internal notification
     await transporter.sendMail({
       from, to: NOTIFY_EMAIL, attachments,
-      subject: `New booth order: ${company.company || "Exhibitor"} for ${fmt(totals.total)}`,
+      subject: `New booth order: ${company.company || "Exhibitor"} for ${fmt(totals.total)}${orderId ? ` (${orderId})` : ""}`,
       text: [
         `New booth services order.`, "",
+        ...(orderId ? [`Order ID: ${orderId}`] : []),
         `Company: ${company.company}`,
         `Contact: ${company.contact}`,
         `Email: ${company.email}`,
@@ -145,12 +149,25 @@ export interface OrderContext {
   company: OrderCompany;
   selection: OrderSelection;
   when: Date;
+  orderId: string;
+}
+
+// Human-readable order reference, printed on the receipt and used as the key in
+// the tracker. Generated once when checkout starts and carried in Stripe
+// metadata, so the webhook, the confirmation screen and the sheet all agree.
+// Ambiguous characters (I, O, 0, 1) are left out for reading off a printout.
+export function newOrderId(when: Date = new Date()): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(6);
+  const suffix = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+  return `EXPO-${when.getFullYear()}-${suffix}`;
 }
 
 export function encodeOrderMetadata(ctx: OrderContext): Record<string, string> {
   const { company, selection, when } = ctx;
   return {
     v: "1",
+    order_id: ctx.orderId,
     company: (company.company || "").slice(0, 480),
     contact: (company.contact || "").slice(0, 480),
     first: (company.firstName || "").slice(0, 240),
@@ -172,6 +189,7 @@ export function decodeOrderMetadata(md: Record<string, string> | null | undefine
   }
   const parsed = md.priced_at ? new Date(md.priced_at) : new Date();
   return {
+    orderId: md.order_id || "",
     company: {
       company: md.company || "",
       contact: md.contact || "",

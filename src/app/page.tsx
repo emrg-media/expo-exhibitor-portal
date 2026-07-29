@@ -80,7 +80,7 @@ export default function BoothServicesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
   const [phase, setPhase] = useState<"form" | "returning" | "confirmed">("form");
-  const [receipt, setReceipt] = useState<{ url: string; company: { company: string; email: string }; totals: OrderTotals } | null>(null);
+  const [receipt, setReceipt] = useState<{ url: string; company: { company: string; email: string }; totals: OrderTotals; orderId?: string } | null>(null);
   const [returnError, setReturnError] = useState<string | null>(null);
   const [canceled, setCanceled] = useState(false);
 
@@ -108,7 +108,7 @@ export default function BoothServicesPage() {
         if (!res.ok) throw new Error(data?.error || "Could not load your receipt.");
         const bytes = Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0));
         const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-        setReceipt({ url, company: data.company, totals: data.totals });
+        setReceipt({ url, company: data.company, totals: data.totals, orderId: data.orderId });
         setPhase("confirmed");
       } catch (err) {
         setReturnError(err instanceof Error ? err.message : "Could not load your receipt.");
@@ -207,7 +207,12 @@ export default function BoothServicesPage() {
       if (!res.ok) throw new Error("Order failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      setReceipt({ url, company: { company: company.company, email: company.email }, totals });
+      setReceipt({
+        url,
+        company: { company: company.company, email: company.email },
+        totals,
+        orderId: res.headers.get("X-Order-Id") || undefined,
+      });
       setPhase("confirmed");
       window.scrollTo({ top: 0, behavior: "smooth" });
       setSubmitting(false);
@@ -391,7 +396,7 @@ export default function BoothServicesPage() {
 
 // ── Confirmation ──────────────────────────────────────────────────────────────
 
-function Confirmation({ receipt, onReset }: { receipt: { url: string; company: { company: string; email: string }; totals: OrderTotals }; onReset: () => void }) {
+function Confirmation({ receipt, onReset }: { receipt: { url: string; company: { company: string; email: string }; totals: OrderTotals; orderId?: string }; onReset: () => void }) {
   const { totals } = receipt;
   return (
     <div className="max-w-xl mx-auto px-6 md:px-8 pt-10">
@@ -403,6 +408,12 @@ function Confirmation({ receipt, onReset }: { receipt: { url: string; company: {
         <p className="text-[14.5px] text-[color:var(--ink-soft)] mt-2 leading-relaxed">
           Thank you{receipt.company.company ? `, ${receipt.company.company.replace(/[.\s]+$/, "")}` : ""}. Your booth add-on order for The Event Planner Expo 2026 has been submitted.
         </p>
+
+        {receipt.orderId && (
+          <p className="num text-[12.5px] font-semibold mt-4 tracking-wide" style={{ color: "var(--brand-navy)" }}>
+            ORDER {receipt.orderId}
+          </p>
+        )}
 
         <div className="mt-6 rounded-xl px-5 py-4 text-left" style={{ border: "1px solid var(--hairline)" }}>
           {totals.lines.map((l) => (

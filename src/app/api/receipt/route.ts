@@ -24,11 +24,13 @@ export async function GET(req: NextRequest) {
     if (!ctx) return NextResponse.json({ error: "Order details are unavailable." }, { status: 404 });
 
     const totals = totalsFor(ctx);
-    const pdf = await renderReceiptPdf(ctx.company, totals, ctx.when);
+    const orderId = ctx.orderId || session.id;
+    const pdf = await renderReceiptPdf(ctx.company, totals, ctx.when, orderId);
 
     return NextResponse.json({
       company: ctx.company,
       totals,
+      orderId,
       pdfBase64: pdf.toString("base64"),
     });
   } catch (err) {

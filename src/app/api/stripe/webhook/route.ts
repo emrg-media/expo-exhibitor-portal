@@ -64,12 +64,13 @@ export async function POST(req: NextRequest) {
   }
 
   const totals = totalsFor(ctx);
-  const pdf = await renderReceiptPdf(ctx.company, totals, ctx.when);
-  await sendOrderEmails(ctx.company, totals, pdf);
+  const orderId = ctx.orderId || session.id;
+  const pdf = await renderReceiptPdf(ctx.company, totals, ctx.when, orderId);
+  await sendOrderEmails(ctx.company, totals, pdf, orderId);
   await logOrder({
     company: ctx.company,
     totals,
-    orderId: session.id,
+    orderId,
     paymentStatus: "Paid",
     when: ctx.when,
   });
