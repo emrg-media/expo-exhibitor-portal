@@ -79,8 +79,45 @@ export default function BoothServicesPage() {
   const [sel, setSel] = useState<OrderSelection>({ amp20Qty: 0, powerStripQty: 0, wifiDevices: 0, leadRetrieval: false });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
-  const [phase, setPhase] = useState<"form" | "confirmed">("form");
-  const [receipt, setReceipt] = useState<{ url: string; company: typeof company; totals: OrderTotals } | null>(null);
+  const [phase, setPhase] = useState<"form" | "returning" | "confirmed">("form");
+  const [receipt, setReceipt] = useState<{ url: string; company: { company: string; email: string }; totals: OrderTotals } | null>(null);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const [canceled, setCanceled] = useState(false);
+
+  // Coming back from Stripe. ?session_id= means the payment went through, so we
+  // rebuild the paid order for the confirmation screen. The receipt email is
+  // sent by the webhook, not here, so refreshing can never re-send it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const clearQuery = () => window.history.replaceState({}, "", window.location.pathname);
+
+    if (params.get("canceled")) {
+      setCanceled(true);
+      clearQuery();
+      return;
+    }
+
+    const sessionId = params.get("session_id");
+    if (!sessionId) return;
+
+    setPhase("returning");
+    (async () => {
+      try {
+        const res = await fetch(`/api/receipt?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Could not load your receipt.");
+        const bytes = Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+        setReceipt({ url, company: data.company, totals: data.totals });
+        setPhase("confirmed");
+      } catch (err) {
+        setReturnError(err instanceof Error ? err.message : "Could not load your receipt.");
+        setPhase("form");
+      } finally {
+        clearQuery();
+      }
+    })();
+  }, []);
 
   const totals = computeOrder(sel, today);
   const leadTier = currentLeadTier(today);
@@ -134,6 +171,8 @@ export default function BoothServicesPage() {
       return;
     }
     setSubmitError(false);
+    setReturnError(null);
+    setCanceled(false);
     setSubmitting(true);
     try {
       const payload = {
@@ -142,6 +181,22 @@ export default function BoothServicesPage() {
         email: company.email,
         phone: company.phone,
       };
+
+      // Preferred path: hand off to Stripe-hosted Checkout.
+      const checkout = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: payload, selection: sel }),
+      });
+      const checkoutData = await checkout.json().catch(() => null);
+      if (checkout.ok && checkoutData?.url) {
+        window.location.href = checkoutData.url;
+        return; // leaving the page; keep the button in its submitting state
+      }
+      // Anything other than "Stripe isn't set up yet" is a real failure.
+      if (checkoutData?.configured !== false) throw new Error(checkoutData?.error || "Checkout failed");
+
+      // Fallback while Stripe has no key: submit directly, no payment taken.
       const res = await fetch("/api/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,12 +205,12 @@ export default function BoothServicesPage() {
       if (!res.ok) throw new Error("Order failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      setReceipt({ url, company: { ...company }, totals });
+      setReceipt({ url, company: { company: company.company, email: company.email }, totals });
       setPhase("confirmed");
       window.scrollTo({ top: 0, behavior: "smooth" });
+      setSubmitting(false);
     } catch {
       setSubmitError(true);
-    } finally {
       setSubmitting(false);
     }
   }
@@ -166,6 +221,8 @@ export default function BoothServicesPage() {
     setPhase("form");
     setSel({ amp20Qty: 0, powerStripQty: 0, wifiDevices: 0, leadRetrieval: false });
     setAttempted(false);
+    setReturnError(null);
+    setCanceled(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -215,7 +272,16 @@ export default function BoothServicesPage() {
         </div>
       </header>
 
-      {phase === "confirmed" && receipt ? (
+      {phase === "returning" ? (
+        <div className="max-w-xl mx-auto px-6 md:px-8 pt-12">
+          <div className="premium-card p-9 text-center">
+            <div className="flex items-center justify-center gap-3 text-[15px] font-semibold" style={{ color: "var(--brand-navy)" }}>
+              <Spinner /> Confirming your payment
+            </div>
+            <p className="text-[13.5px] text-[color:var(--ink-soft)] mt-3">This only takes a moment. Please do not close this page.</p>
+          </div>
+        </div>
+      ) : phase === "confirmed" && receipt ? (
         <Confirmation receipt={receipt} onReset={resetOrder} />
       ) : (
         <div className="max-w-5xl mx-auto px-6 md:px-8 pt-8">
@@ -223,6 +289,19 @@ export default function BoothServicesPage() {
 
             {/* Left: form */}
             <div className="space-y-5">
+              {/* Returned from Stripe without completing, or the receipt lookup failed */}
+              {(canceled || returnError) && (
+                <div className="rounded-xl px-5 py-4 text-[13.5px] leading-relaxed"
+                  style={{ background: "rgba(27,58,160,0.05)", border: "1px solid rgba(27,58,160,0.25)", color: "var(--ink)" }}>
+                  <span className="font-semibold" style={{ color: "var(--brand-navy)" }}>
+                    {canceled ? "Payment was not completed. " : "We could not load your receipt. "}
+                  </span>
+                  {canceled
+                    ? "Your selections are still here, so you can pick up where you left off."
+                    : `${returnError} If you were charged, your receipt is on its way by email.`}
+                </div>
+              )}
+
               {/* Company */}
               <section ref={(el) => { sectionRefs.current[0] = el; }} className="premium-card p-6 md:p-7">
                 <StepTitle n={1}>Company Information</StepTitle>
