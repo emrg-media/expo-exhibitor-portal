@@ -65,6 +65,12 @@ export async function POST(req: NextRequest) {
       // {CHECKOUT_SESSION_ID} is substituted by Stripe, leave it unencoded.
       success_url: `${origin}/?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?canceled=1`,
+      // Always bill in USD. The Stripe account has Adaptive Pricing on, which
+      // was defaulting overseas exhibitors to their local currency (an
+      // Indonesian IP was shown IDR 3,193,059.92 as the pre-selected option).
+      // Our prices, receipt PDF and tracker are all USD, so a converted charge
+      // would not match the paperwork Jessica reconciles against.
+      adaptive_pricing: { enabled: false },
       metadata: encodeOrderMetadata({ company, selection, when, orderId }),
       payment_intent_data: {
         description: `${orderId} Expo 2026 booth services for ${company.company || "exhibitor"} (${fmt(totals.total)})`,
