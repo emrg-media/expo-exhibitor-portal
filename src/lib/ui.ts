@@ -11,8 +11,11 @@ export function useCountUp(value: number, duration = 260): number {
 
   useEffect(() => {
     const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // requestAnimationFrame is paused in a background tab, so animating there
+    // would leave the price frozen at the previous amount. Snap instead.
+    const hidden = typeof document !== "undefined" && document.hidden;
     const from = display;
-    if (reduce || from === value) {
+    if (reduce || hidden || from === value) {
       setDisplay(value);
       return;
     }
