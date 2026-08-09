@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { decodeOrderMetadata, renderReceiptPdf, sendOrderEmails, totalsFor } from "@/lib/order";
+import { alertOps, decodeOrderMetadata, renderReceiptPdf, sendOrderEmails, totalsFor } from "@/lib/order";
 import { logOrder } from "@/lib/logOrder";
+import { fmt } from "@/lib/pricing";
 
 // Stripe calls this once payment actually succeeds, which is the only point at
 // which we send a receipt. Signature is verified against STRIPE_WEBHOOK_SECRET,
@@ -65,15 +66,46 @@ export async function POST(req: NextRequest) {
 
   const totals = totalsFor(ctx);
   const orderId = ctx.orderId || session.id;
-  const pdf = await renderReceiptPdf(ctx.company, totals, ctx.when, orderId);
-  await sendOrderEmails(ctx.company, totals, pdf, orderId);
-  await logOrder({
+
+  // Past this point the exhibitor has been charged. Nothing here may fail
+  // quietly: a paid order that never reaches the receipt or the tracker is the
+  // worst outcome this system has, so someone gets told.
+  const problems: string[] = [];
+  let pdf: Buffer | null = null;
+
+  try {
+    pdf = await renderReceiptPdf(ctx.company, totals, ctx.when, orderId);
+  } catch (err) {
+    problems.push(`receipt PDF failed: ${err instanceof Error ? err.message : err}`);
+  }
+
+  if (pdf) {
+    const mail = await sendOrderEmails(ctx.company, totals, pdf, orderId);
+    if (!mail.ok) problems.push(`confirmation email failed: ${mail.error}`);
+  }
+
+  const logged = await logOrder({
     company: ctx.company,
     totals,
     orderId,
     paymentStatus: "Paid",
     when: ctx.when,
   });
+  if (!logged.ok) problems.push(`order tracker failed: ${logged.error}`);
+
+  if (problems.length > 0) {
+    await alertOps(orderId, problems, [
+      `Company: ${ctx.company.company}`,
+      `Contact: ${ctx.company.contact}`,
+      `Email: ${ctx.company.email}`,
+      `Phone: ${ctx.company.phone}`,
+      ``,
+      ...totals.lines.map((l) => `${l.label} x${l.qty} = ${fmt(l.amount)}`),
+      ``,
+      `Total paid: ${fmt(totals.total)}`,
+      `Stripe session: ${session.id}`,
+    ].join("\n"));
+  }
 
   if (paymentIntentId) {
     try {

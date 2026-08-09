@@ -353,9 +353,10 @@ function nameParts(c: LogOrderInput["company"]): { first: string; last: string }
   return { first: words[0] || "", last: words.slice(1).join(" ") };
 }
 
-export async function logOrder(input: LogOrderInput): Promise<void> {
+export async function logOrder(input: LogOrderInput): Promise<{ ok: boolean; error?: string }> {
   const conn = client();
-  if (!conn) return;
+  // Not configured is not a failure: nothing was promised.
+  if (!conn) return { ok: true };
   const { sheets, sheetId } = conn;
   const { company, totals, orderId, paymentStatus } = input;
 
@@ -399,15 +400,19 @@ export async function logOrder(input: LogOrderInput): Promise<void> {
       }));
       const hits = (check.data.values || []).flat().filter((v) => v === orderId).length;
 
-      if (hits === 1) return;
+      if (hits === 1) return { ok: true };
       if (hits > 1) {
         console.warn(`Expo order ${orderId} recorded ${hits} times; de-duplicate in the tracker.`);
-        return;
+        return { ok: true };
       }
       console.warn(`Expo order ${orderId} was overwritten by a concurrent write, retrying (${attempt + 1}/4)`);
     }
-    console.error(`Expo order ${orderId} could not be recorded in the tracker after 4 attempts`);
+    const error = "not recorded after 4 attempts (overwritten by concurrent writes)";
+    console.error(`Expo order ${orderId}: ${error}`);
+    return { ok: false, error };
   } catch (err) {
-    console.error("Expo order logging failed:", err instanceof Error ? err.message : err);
+    const error = err instanceof Error ? err.message : String(err);
+    console.error("Expo order logging failed:", error);
+    return { ok: false, error };
   }
 }

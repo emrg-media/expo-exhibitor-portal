@@ -33,6 +33,45 @@ function categoryDetail(totals: OrderTotals, keys: string[]): string {
   return picked.map((l) => `${l.qty} x ${l.label} (${fmt(l.amount)})`).join(", ");
 }
 
+/**
+ * Something went wrong after the card was charged. Email the details so the
+ * order can be handled by hand, rather than leaving it in a log nobody reads.
+ * Plain text with no attachment: the less this depends on, the more likely it
+ * is to get through when something else has already failed.
+ */
+export async function alertOps(orderId: string, problems: string[], detail: string): Promise<void> {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.error(`ALERT (no SMTP to send it): order ${orderId} had problems: ${problems.join("; ")}`);
+    return;
+  }
+  try {
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: parseInt(SMTP_PORT || "587"),
+      secure: parseInt(SMTP_PORT || "587") === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+    await transporter.sendMail({
+      from: SMTP_FROM || SMTP_USER,
+      to: process.env.EXPO_ALERT_EMAIL || NOTIFY_EMAIL,
+      subject: `ACTION NEEDED: paid booth order ${orderId} was not fully processed`,
+      text: [
+        `A booth services order was paid for, but part of the follow-up failed.`,
+        `The customer has been charged. Please handle this one manually.`, "",
+        `Order ID: ${orderId}`,
+        `What failed: ${problems.join("; ")}`, "",
+        `Order details:`,
+        detail, "",
+        `The payment itself is fine and visible in Stripe. This alert only means`,
+        `the receipt email or the order tracker did not complete.`,
+      ].join("\n"),
+    });
+  } catch (err) {
+    console.error("ALERT could not be sent:", err instanceof Error ? err.message : err);
+  }
+}
+
 export function receiptFilename(company: ReceiptCompany): string {
   return `expo-receipt-${(company.company || "booth").replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
 }
@@ -50,9 +89,10 @@ export async function renderReceiptPdf(
 // a mail failure must not lose an order that has already been paid for.
 export async function sendOrderEmails(
   company: ReceiptCompany, totals: OrderTotals, pdf: Buffer, orderId?: string,
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return;
+  // Not configured is not a failure: nothing was promised.
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return { ok: true };
 
   try {
     const transporter = nodemailer.createTransport({
@@ -131,8 +171,11 @@ export async function sendOrderEmails(
         `Total: ${fmt(totals.total)}`,
       ].join("\n"),
     });
+    return { ok: true };
   } catch (err) {
-    console.error("Expo order email failed:", err instanceof Error ? err.message : err);
+    const error = err instanceof Error ? err.message : String(err);
+    console.error("Expo order email failed:", error);
+    return { ok: false, error };
   }
 }
 
