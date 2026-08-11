@@ -55,6 +55,47 @@ export interface OrderSelection {
   leadRetrieval: boolean; // one registration per company (CONFIRM if quantity should apply)
 }
 
+// Largest quantity the form will price without a conversation. Nothing on a
+// booth plausibly needs more, and the checkout API is public: without a ceiling
+// a crafted request can open a six-figure Stripe Checkout Session.
+export const MAX_QTY = { amp20Qty: 25, powerStripQty: 50, wifiDevices: 50 } as const;
+
+/**
+ * Coerce whatever arrived over the wire into a selection we are willing to
+ * price: whole numbers, never negative, anything unparseable treated as none.
+ * The browser clamps as well, but the API is reachable directly.
+ */
+export function sanitizeSelection(raw: unknown): OrderSelection {
+  const s = (raw ?? {}) as Record<string, unknown>;
+  const qty = (v: unknown) => {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  return {
+    amp20Qty: qty(s.amp20Qty),
+    powerStripQty: qty(s.powerStripQty),
+    wifiDevices: qty(s.wifiDevices),
+    leadRetrieval: s.leadRetrieval === true,
+  };
+}
+
+/**
+ * Quantities above the ceiling are refused rather than silently reduced: an
+ * exhibitor who asked for 80 outlets must not be quietly charged for 50.
+ */
+export function selectionTooLarge(sel: OrderSelection): string | null {
+  const over = (
+    [
+      ["amp20Qty", "20-amp outlets"],
+      ["powerStripQty", "power strips"],
+      ["wifiDevices", "Wi-Fi devices"],
+    ] as const
+  ).find(([k]) => sel[k] > MAX_QTY[k]);
+  if (!over) return null;
+  const [key, label] = over;
+  return `This form handles up to ${MAX_QTY[key]} ${label} per order. Please contact the Expo team to arrange a larger order.`;
+}
+
 export interface OrderLine {
   key: string;
   label: string;
@@ -135,8 +176,13 @@ export function computeOrder(sel: OrderSelection, today: Date): OrderTotals {
   }
 
   const subtotal = lines.reduce((s, l) => s + l.amount, 0);
-  const fee = subtotal * PROCESSING_FEE_RATE;
-  return { lines, subtotal, fee, total: subtotal + fee };
+  // Round to whole cents so the page, the receipt and the Stripe charge agree.
+  // Every price here is currently a whole dollar, which makes 3% land on exact
+  // cents anyway, but a price ending in cents would otherwise put a fraction of
+  // a cent between what is displayed and what is billed.
+  const fee = Math.round(subtotal * PROCESSING_FEE_RATE * 100) / 100;
+  const total = Math.round((subtotal + fee) * 100) / 100;
+  return { lines, subtotal, fee, total };
 }
 
 export function fmt(n: number): string {

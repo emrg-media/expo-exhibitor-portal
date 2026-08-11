@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { computeOrder, fmt, PROCESSING_FEE_RATE, type OrderSelection } from "@/lib/pricing";
+import { computeOrder, fmt, PROCESSING_FEE_RATE, sanitizeSelection, selectionTooLarge } from "@/lib/pricing";
 import { encodeOrderMetadata, isValidOrderEmail, newOrderId, type OrderCompany } from "@/lib/order";
 
 // Creates a Stripe-hosted Checkout Session and hands back its URL for the
 // browser to redirect to. Responds { configured: false } when no Stripe key is
 // present so the form can fall back to the no-payment path instead of breaking.
 export async function POST(req: NextRequest) {
-  const { company, selection } = (await req.json()) as {
-    company: OrderCompany; selection: OrderSelection;
-  };
+  // This endpoint is public, so nothing in the body is trusted: quantities are
+  // coerced to whole numbers and bounded before anything is priced.
+  let body: { company?: OrderCompany; selection?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+  const company = body?.company ?? ({} as OrderCompany);
+  const selection = sanitizeSelection(body?.selection);
 
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return NextResponse.json({ configured: false });
@@ -21,6 +28,10 @@ export async function POST(req: NextRequest) {
 
   if (totals.lines.length === 0) {
     return NextResponse.json({ error: "No services selected." }, { status: 400 });
+  }
+  const tooLarge = selectionTooLarge(selection);
+  if (tooLarge) {
+    return NextResponse.json({ error: tooLarge }, { status: 400 });
   }
   if (!isValidOrderEmail(company?.email)) {
     return NextResponse.json({ error: "A valid email is required." }, { status: 400 });
@@ -82,6 +93,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown Stripe error";
     console.error("Stripe checkout session failed:", message);
-    return NextResponse.json({ error: "Could not start checkout.", detail: message }, { status: 502 });
+    return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 502 });
   }
 }
