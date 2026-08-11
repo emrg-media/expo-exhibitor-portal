@@ -1,11 +1,31 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import nodemailer from "nodemailer";
 import { TABS } from "@/lib/logOrder";
 
 // Configuration check for the deployed app: which integrations are wired up,
 // and can the tracker actually be reached with the credentials in this
 // environment. Reports presence and counts only, never values, so it is safe to
 // leave public. Read-only: sends no email and writes no rows.
+// Opens the SMTP connection and authenticates, without sending anything.
+// Checking that the variables merely exist is not worth much: a wrong app
+// password looks perfectly healthy right up until a paid order gets no receipt.
+async function verifySmtp(): Promise<{ verified: boolean; error?: string }> {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return { verified: false, error: "not configured" };
+  try {
+    const port = parseInt(SMTP_PORT || "587");
+    await nodemailer.createTransport({
+      host: SMTP_HOST, port, secure: port === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      connectionTimeout: 8000, greetingTimeout: 8000,
+    }).verify();
+    return { verified: true };
+  } catch (err) {
+    return { verified: false, error: err instanceof Error ? err.message.slice(0, 200) : "unknown error" };
+  }
+}
+
 export async function GET() {
   const env = process.env;
 
@@ -41,6 +61,8 @@ export async function GET() {
     }
   }
 
+  const smtp = await verifySmtp();
+
   return NextResponse.json({
     payments: {
       stripeKey: Boolean(env.STRIPE_SECRET_KEY),
@@ -51,7 +73,12 @@ export async function GET() {
     },
     email: {
       smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
+      smtpVerified: smtp.verified,
+      ...(smtp.error ? { smtpError: smtp.error } : {}),
       notifyRecipientSet: Boolean(env.EXPO_NOTIFY_EMAIL),
+      // Gmail rewrites or rejects a From that is neither the authenticated
+      // account nor a verified "Send mail as" alias.
+      fromMatchesUser: !env.SMTP_FROM || env.SMTP_FROM === env.SMTP_USER,
     },
     tracker,
   }, { headers: { "Cache-Control": "no-store" } });
