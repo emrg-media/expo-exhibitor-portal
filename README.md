@@ -94,6 +94,24 @@ the summary formulas. Uses `appendCells` instead.
 the tab was hidden stayed frozen at the old amount. `useCountUp` now snaps
 instead of animating when `document.hidden`.
 
+**The API routes are public, and were trusting the request body.** They are
+reachable directly, not only from the form. Found by stress testing before go
+live:
+
+- `/api/order`, the no-payment development fallback, sent a receipt, emailed the
+  team and wrote a tracker row for anyone who called it, and took the pricing
+  date from the caller, which chose the lead retrieval tier. It now returns 404
+  whenever `STRIPE_SECRET_KEY` is set, and always prices on the server clock.
+- Quantities were used exactly as received. Fractions reached Stripe and failed
+  there, and nothing capped the size of an order. `sanitizeSelection()` now
+  coerces to whole positive numbers and `selectionTooLarge()` refuses anything
+  over `MAX_QTY`. Over-limit orders are **refused, not clamped**: silently
+  reducing 80 outlets to 25 would charge an exhibitor for less than they asked.
+
+Prices were never at risk: they come from `pricing.ts` on the server and the
+browser never sends amounts. Verified by reconciling 64,826 order combinations
+against what Stripe would charge, with no mismatch.
+
 ---
 
 ## Runbook
