@@ -127,6 +127,28 @@ payment, then check the tracker for the Order ID. If the payment exists but the
 row does not, you should have received an "ACTION NEEDED" alert email with the
 full order details.
 
+**Re-send a receipt** → `/api/resend` rebuilds it from the tracker row, so it
+works long after the Stripe session is gone. Set `EXPO_ADMIN_TOKEN` to a long
+random string first; without it the endpoint returns 404 to everyone. The
+recipient is always the address stored on the order and cannot be passed in, so
+it cannot be used as a mail relay.
+
+```bash
+curl -s https://www.expoupgrades.com/api/resend -H "x-admin-token: $TOKEN"
+curl -s -X POST https://www.expoupgrades.com/api/resend \
+  -H "x-admin-token: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"orderId":"EXPO-2026-XXXXXX"}'
+```
+
+`{"all": true}` re-sends every order in the tracker, which is the backfill after
+an email outage. Note it also re-sends the internal notification, so whoever is
+on `EXPO_NOTIFY_EMAIL` gets one copy per order.
+
+**Check email actually works** → `/api/health` opens the SMTP connection and
+authenticates. `smtpVerified` false means no receipt will ever arrive, whatever
+`smtpConfigured` says. Watch `fromMatchesUser` too: Gmail rejects a `SMTP_FROM`
+that is not the authenticated account or a verified "Send mail as" alias.
+
 **Find an order** → every receipt, email and tracker row carries the same
 `EXPO-2026-XXXXXX` Order ID.
 
