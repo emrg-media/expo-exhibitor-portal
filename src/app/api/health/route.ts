@@ -3,10 +3,6 @@ import { google } from "googleapis";
 import nodemailer from "nodemailer";
 import { TABS } from "@/lib/logOrder";
 
-// Configuration check for the deployed app: which integrations are wired up,
-// and can the tracker actually be reached with the credentials in this
-// environment. Reports presence and counts only, never values, so it is safe to
-// leave public. Read-only: sends no email and writes no rows.
 // Opens the SMTP connection and authenticates, without sending anything.
 // Checking that the variables merely exist is not worth much: a wrong app
 // password looks perfectly healthy right up until a paid order gets no receipt.
@@ -26,6 +22,17 @@ async function verifySmtp(): Promise<{ verified: boolean; error?: string }> {
   }
 }
 
+// SMTP_FROM may carry a display name: `The Event Planner Expo <a@b.com>`.
+function fromAddress(v?: string): string {
+  if (!v) return "";
+  const m = v.match(/<([^>]+)>/);
+  return (m ? m[1] : v).trim().toLowerCase();
+}
+
+// Configuration check for the deployed app: which integrations are wired up,
+// and can the tracker actually be reached with the credentials in this
+// environment. Reports presence and counts only, never values, so it is safe to
+// leave public. Read-only: sends no email and writes no rows.
 export async function GET() {
   const env = process.env;
 
@@ -78,7 +85,9 @@ export async function GET() {
       notifyRecipientSet: Boolean(env.EXPO_NOTIFY_EMAIL),
       // Gmail rewrites or rejects a From that is neither the authenticated
       // account nor a verified "Send mail as" alias.
-      fromMatchesUser: !env.SMTP_FROM || env.SMTP_FROM === env.SMTP_USER,
+      fromMatchesUser: fromAddress(env.SMTP_FROM) === (env.SMTP_USER || "").toLowerCase()
+        || !env.SMTP_FROM,
+      ...(env.SMTP_REPLY_TO ? { replyToSet: true } : {}),
     },
     tracker,
   }, { headers: { "Cache-Control": "no-store" } });

@@ -102,6 +102,10 @@ export async function sendOrderEmails(
       auth: { user: SMTP_USER, pass: SMTP_PASS },
     });
     const from = SMTP_FROM || SMTP_USER;
+    // The account that authenticates does not have to be the one that answers.
+    // Gmail only permits a From it owns or has verified, but Reply-To is free,
+    // so receipts can come from a configured mailbox and still reach the team.
+    const replyTo = process.env.SMTP_REPLY_TO || undefined;
     const itemLines = totals.lines.map((l) => `  ${l.label} (${l.qty} x ${fmt(l.unit)}) = ${fmt(l.amount)}`).join("\n");
     const attachments = [{ filename: receiptFilename(company), content: pdf, contentType: "application/pdf" }];
 
@@ -113,7 +117,7 @@ export async function sendOrderEmails(
 
     // Buyer confirmation (Jessica's template)
     await transporter.sendMail({
-      from, to: company.email, attachments,
+      from, to: company.email, attachments, replyTo,
       subject: "Your Event Planner Expo 2026 booth add-on order confirmation",
       text: [
         `Hi ${firstName(company.contact)},`, "",
@@ -156,7 +160,7 @@ export async function sendOrderEmails(
 
     // Internal notification
     await transporter.sendMail({
-      from, to: NOTIFY_EMAIL, attachments,
+      from, to: NOTIFY_EMAIL, attachments, replyTo: company.email || replyTo,
       subject: `New booth order: ${company.company || "Exhibitor"} for ${fmt(totals.total)}${orderId ? ` (${orderId})` : ""}`,
       text: [
         `New booth services order.`, "",
