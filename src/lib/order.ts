@@ -39,8 +39,37 @@ function categoryDetail(totals: OrderTotals, keys: string[]): string {
  * Plain text with no attachment: the less this depends on, the more likely it
  * is to get through when something else has already failed.
  */
+/**
+ * Non-email alert channel. When email is the thing that has broken, an emailed
+ * alarm cannot ring, which is exactly how three paid orders went out with no
+ * receipt and nobody found out. Set EXPO_ALERT_WEBHOOK to a Slack or Discord
+ * incoming webhook and the alarm survives an email outage.
+ */
+async function postAlertWebhook(text: string): Promise<void> {
+  const url = process.env.EXPO_ALERT_WEBHOOK;
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // Slack reads `text`, Discord reads `content`. Sending both means one
+      // variable works with either service without a code change.
+      body: JSON.stringify({ text, content: text }),
+    });
+  } catch (err) {
+    console.error("Alert webhook failed:", err instanceof Error ? err.message : err);
+  }
+}
+
 export async function alertOps(orderId: string, problems: string[], detail: string): Promise<void> {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
+
+  // Always first, and never conditional on SMTP working.
+  await postAlertWebhook(
+    `ACTION NEEDED: paid order ${orderId} was not fully processed.\n`
+    + `What failed: ${problems.join("; ")}\n\n${detail}`,
+  );
+
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     console.error(`ALERT (no SMTP to send it): order ${orderId} had problems: ${problems.join("; ")}`);
     return;

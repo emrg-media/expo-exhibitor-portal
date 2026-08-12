@@ -149,6 +149,40 @@ authenticates. `smtpVerified` false means no receipt will ever arrive, whatever
 `smtpConfigured` says. Watch `fromMatchesUser` too: Gmail rejects a `SMTP_FROM`
 that is not the authenticated account or a verified "Send mail as" alias.
 
+---
+
+## Monitoring
+
+Two alarms, neither of which depends on email, because email is the part that
+has actually failed in production.
+
+**1. Someone watches the health check.** `/api/health?strict=1` answers **503**
+instead of 200 when anything required for a paid order to reach the customer is
+broken: Stripe half-configured, SMTP not authenticating, tracker unreachable.
+Point any uptime monitor (Better Stack, UptimeRobot, Pingdom) at it on a 5
+minute interval with SMS or Slack notification. That is the check that would
+have caught the revoked Gmail app password on the day it happened rather than
+three orders later.
+
+**2. The app shouts when an order half-fails.** Set `EXPO_ALERT_WEBHOOK` to a
+Slack or Discord incoming webhook. Post-payment problems post there *and* by
+email. One payload works for both services.
+
+### Why this exists
+
+A Gmail app password was revoked (they die automatically when the account owner
+changes their password). Three paid orders produced no receipt. The "ACTION
+NEEDED" alert never arrived either, because it was an email, sent over the same
+dead credential. An alarm that runs through the failing component is not an
+alarm.
+
+**Gmail app passwords are a recurring liability.** They break whenever the owner
+changes their password, turns 2-Step Verification off and on, or a Workspace
+admin tightens policy, and nothing warns anyone. A domain sender with SPF and
+DKIM (a transactional provider, or the Workspace SMTP relay) removes the whole
+failure mode. `SMTP_REPLY_TO` already decouples who sends from who answers, so
+the sending identity can change without touching the customer experience.
+
 **Find an order** → every receipt, email and tracker row carries the same
 `EXPO-2026-XXXXXX` Order ID.
 

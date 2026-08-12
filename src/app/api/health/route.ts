@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import nodemailer from "nodemailer";
 import { TABS } from "@/lib/logOrder";
@@ -33,7 +33,7 @@ function fromAddress(v?: string): string {
 // and can the tracker actually be reached with the credentials in this
 // environment. Reports presence and counts only, never values, so it is safe to
 // leave public. Read-only: sends no email and writes no rows.
-export async function GET() {
+export async function GET(req: NextRequest) {
   const env = process.env;
 
   const tracker: Record<string, unknown> = {
@@ -70,25 +70,37 @@ export async function GET() {
 
   const smtp = await verifySmtp();
 
-  return NextResponse.json({
-    payments: {
-      stripeKey: Boolean(env.STRIPE_SECRET_KEY),
-      webhookSecret: Boolean(env.STRIPE_WEBHOOK_SECRET),
-      // Both must be set before real orders: with a key but no webhook secret,
-      // cards would be charged and no receipt would ever be sent.
-      readyForLiveOrders: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET),
-    },
-    email: {
-      smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
-      smtpVerified: smtp.verified,
-      ...(smtp.error ? { smtpError: smtp.error } : {}),
-      notifyRecipientSet: Boolean(env.EXPO_NOTIFY_EMAIL),
-      // Gmail rewrites or rejects a From that is neither the authenticated
-      // account nor a verified "Send mail as" alias.
-      fromMatchesUser: fromAddress(env.SMTP_FROM) === (env.SMTP_USER || "").toLowerCase()
-        || !env.SMTP_FROM,
-      ...(env.SMTP_REPLY_TO ? { replyToSet: true } : {}),
-    },
-    tracker,
-  }, { headers: { "Cache-Control": "no-store" } });
+  const payments = {
+    stripeKey: Boolean(env.STRIPE_SECRET_KEY),
+    webhookSecret: Boolean(env.STRIPE_WEBHOOK_SECRET),
+    // Both must be set before real orders: with a key but no webhook secret,
+    // cards would be charged and no receipt would ever be sent.
+    readyForLiveOrders: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET),
+  };
+
+  const email = {
+    smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
+    smtpVerified: smtp.verified,
+    ...(smtp.error ? { smtpError: smtp.error } : {}),
+    notifyRecipientSet: Boolean(env.EXPO_NOTIFY_EMAIL),
+    // Gmail rewrites or rejects a From that is neither the authenticated
+    // account nor a verified "Send mail as" alias.
+    fromMatchesUser: !env.SMTP_FROM || fromAddress(env.SMTP_FROM) === (env.SMTP_USER || "").toLowerCase(),
+    ...(env.SMTP_REPLY_TO ? { replyToSet: true } : {}),
+  };
+
+  // Everything that has to be true for a paid order to reach the customer.
+  const ok = payments.readyForLiveOrders
+    && email.smtpVerified
+    && (!tracker.configured || tracker.reachable === true);
+
+  // ?strict=1 answers 503 instead of 200 when something is broken, so an
+  // ordinary uptime monitor can watch this URL and raise the alarm over SMS or
+  // Slack. Deliberately not the default: the plain view is for reading.
+  const strict = req.nextUrl.searchParams.get("strict") === "1";
+
+  return NextResponse.json({ ok, payments, email, tracker }, {
+    status: strict && !ok ? 503 : 200,
+    headers: { "Cache-Control": "no-store" },
+  });
 }
