@@ -29,6 +29,16 @@ function fromAddress(v?: string): string {
   return (m ? m[1] : v).trim().toLowerCase();
 }
 
+// Masked, so a public endpoint can confirm *which* mailbox is configured
+// without publishing a staff address for scrapers.
+function maskEmail(v?: string): string | undefined {
+  const a = fromAddress(v);
+  if (!a) return undefined;
+  const [user, domain] = a.split("@");
+  if (!domain) return "set";
+  return `${user.slice(0, 2)}***@${domain}`;
+}
+
 // Configuration check for the deployed app: which integrations are wired up,
 // and can the tracker actually be reached with the credentials in this
 // environment. Reports presence and counts only, never values, so it is safe to
@@ -81,6 +91,11 @@ export async function GET(req: NextRequest) {
   const email = {
     smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
     smtpVerified: smtp.verified,
+    // Which mailbox is authenticating, and which addresses it sends and
+    // replies as. The three being out of step is a common misconfiguration.
+    smtpUser: maskEmail(env.SMTP_USER),
+    sendsAs: maskEmail(env.SMTP_FROM),
+    repliesTo: maskEmail(env.SMTP_REPLY_TO),
     ...(smtp.error ? { smtpError: smtp.error } : {}),
     notifyRecipientSet: Boolean(env.EXPO_NOTIFY_EMAIL),
     // Gmail rewrites or rejects a From that is neither the authenticated
