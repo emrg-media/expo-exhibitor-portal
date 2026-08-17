@@ -13,6 +13,10 @@ import nodemailer from "nodemailer";
 import { computeOrder, fmt, type OrderSelection, type OrderTotals } from "@/lib/pricing";
 import { buildReceiptDocument, type ReceiptCompany } from "@/lib/ReceiptPDF";
 
+/** Which of the two portals this build is. Stamped into Stripe metadata so the
+ *  shared Stripe account cannot cross-deliver orders between them. */
+export const SITE = "booth";
+
 export const NOTIFY_EMAIL = process.env.EXPO_NOTIFY_EMAIL || "jstewart@emrgmedia.com";
 
 export function isValidOrderEmail(email?: string): boolean {
@@ -243,6 +247,9 @@ export function encodeOrderMetadata(ctx: OrderContext): Record<string, string> {
   const { company, selection, when } = ctx;
   return {
     v: "1",
+    // Both sites share one Stripe account, so every checkout event is delivered
+    // to both webhook endpoints. This is how each one recognises its own.
+    site: SITE,
     order_id: ctx.orderId,
     company: (company.company || "").slice(0, 480),
     contact: (company.contact || "").slice(0, 480),
@@ -258,6 +265,9 @@ export function encodeOrderMetadata(ctx: OrderContext): Record<string, string> {
 
 export function decodeOrderMetadata(md: Record<string, string> | null | undefined): OrderContext | null {
   if (!md || !md.sel) return null;
+  // An order stamped for the other site is not ours to process. Sessions
+  // created before the stamp existed have no `site`, so those still decode.
+  if (md.site && md.site !== SITE) return null;
   const nums: Record<string, number> = {};
   for (const part of md.sel.split(",")) {
     const [k, v] = part.split(":");

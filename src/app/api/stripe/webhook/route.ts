@@ -65,6 +65,14 @@ export async function POST(req: NextRequest) {
   }
 
   const totals = totalsFor(ctx);
+  // Belt and braces for sessions created before orders carried a site stamp:
+  // an order from the other portal decodes to nothing we sell, and a real order
+  // always has at least one line. Never email or log a zero-value receipt.
+  if (totals.lines.length === 0) {
+    console.error("Stripe webhook: session", session.id, "decoded to no line items, ignoring");
+    return NextResponse.json({ received: true, ignored: "no line items for this site" });
+  }
+
   const orderId = ctx.orderId || session.id;
 
   // Past this point the exhibitor has been charged. Nothing here may fail
