@@ -38,7 +38,7 @@ export interface LeadTier {
   end: string;     // inclusive last day, YYYY-MM-DD
 }
 export const LEAD_TIERS: LeadTier[] = [
-  { id: "t1", label: "By August 31", price: 150, end: "2026-08-31" },
+  { id: "t1", label: "By August 28", price: 150, end: "2026-08-28" },
   { id: "t2", label: "By September 10", price: 250, end: "2026-09-10" },
   { id: "t3", label: "By September 24", price: 300, end: "2026-09-24" },
   { id: "t4", label: "By October 9", price: 350, end: "2026-10-09" },
