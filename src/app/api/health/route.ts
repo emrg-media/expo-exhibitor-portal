@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import nodemailer from "nodemailer";
 import { TABS } from "@/lib/logOrder";
+import { EVENT_TZ, currentLeadTier, toDateStr } from "@/lib/pricing";
 
 // Opens the SMTP connection and authenticates, without sending anything.
 // Checking that the variables merely exist is not worth much: a wrong app
@@ -80,6 +81,19 @@ export async function GET(req: NextRequest) {
 
   const smtp = await verifySmtp();
 
+  // What this server would charge for lead retrieval right now, and the date it
+  // is deciding that from. Tiers roll over at midnight in EVENT_TZ, so this is
+  // how you confirm an increase landed when it was supposed to, without having
+  // to place an order to find out.
+  const now = new Date();
+  const tier = currentLeadTier(now);
+  const leadRetrieval = {
+    timezone: EVENT_TZ,
+    dateThere: toDateStr(now),
+    price: tier ? tier.price : null,
+    tier: tier ? tier.label : "closed",
+  };
+
   const payments = {
     stripeKey: Boolean(env.STRIPE_SECRET_KEY),
     webhookSecret: Boolean(env.STRIPE_WEBHOOK_SECRET),
@@ -114,7 +128,7 @@ export async function GET(req: NextRequest) {
   // Slack. Deliberately not the default: the plain view is for reading.
   const strict = req.nextUrl.searchParams.get("strict") === "1";
 
-  return NextResponse.json({ ok, payments, email, tracker }, {
+  return NextResponse.json({ ok, payments, email, leadRetrieval, tracker }, {
     status: strict && !ok ? 503 : 200,
     headers: { "Cache-Control": "no-store" },
   });
