@@ -112,8 +112,27 @@ export interface OrderTotals {
   total: number;
 }
 
+/** The timezone every deadline in this file is expressed in. */
+export const EVENT_TZ = "America/New_York";
+
+/**
+ * "Today" for pricing purposes, as YYYY-MM-DD in New York.
+ *
+ * Deliberately not the local calendar date. On the server that would be UTC,
+ * so a tier would roll over at 8pm the previous evening in New York and an
+ * exhibitor ordering at 9pm would be charged the next tier's price. In the
+ * browser it would be the visitor's own timezone, so the countdown would
+ * disagree with what they are actually charged. The Expo runs in New York and
+ * the deadlines are set in New York, so both ends resolve the date there.
+ */
 export function toDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // en-CA formats as YYYY-MM-DD, which is what the tier comparison expects.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: EVENT_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 // Current lead-retrieval tier for a given day. Chronological string compare on

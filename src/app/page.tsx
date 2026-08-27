@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   LEAD_TIERS, ELECTRIC, EVENT_DAYS, WIFI_PER_DEVICE, PROCESSING_FEE_RATE, EVENT_INFO, WIFI_ELECTRIC_DEADLINE,
-  computeOrder, currentLeadTier, tierStatus, fmt,
+  computeOrder, currentLeadTier, tierStatus, fmt, toDateStr,
   type OrderSelection, type OrderTotals, type LeadTier,
 } from "@/lib/pricing";
 import { useCountUp, formatPhone, isValidEmail } from "@/lib/ui";
@@ -24,9 +24,13 @@ function shortEnd(end: string): string {
 // Days remaining (inclusive of today and the tier's last day) at the current rate.
 function daysLeftInTier(today: Date, endStr: string): number {
   const [y, m, d] = endStr.split("-").map(Number);
-  const end = new Date(y, m - 1, d);
-  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((end.getTime() - t0.getTime()) / 86400000) + 1;
+  const end = Date.UTC(y, m - 1, d);
+  // Count from the New York date, matching how the price is actually decided,
+  // so a visitor in another timezone is never shown a different number of days
+  // than the one their order will be priced against.
+  const [ty, tm, td] = toDateStr(today).split("-").map(Number);
+  const t0 = Date.UTC(ty, tm - 1, td);
+  return Math.round((end - t0) / 86400000) + 1;
 }
 
 export default function BoothServicesPage() {
